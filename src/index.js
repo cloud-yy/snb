@@ -5,6 +5,7 @@ import loadEvents from "#functions/loaders/loadEvents"
 import loadCommands from "#functions/loaders/loadCommands"
 import loadRoutes from "#functions/loaders/loadRoutes"
 import { sequelize } from "#models/models"
+import loadInteractions from "#functions/loaders/loadInteractions"
 
 const { Guilds, GuildMembers, GuildMessages, MessageContent, DirectMessages, GuildPresences } = GatewayIntentBits
 const { User, Message, GuildMember, ThreadMember } = Partials
@@ -24,7 +25,7 @@ client.cooldowns = new Collection()
 client.setMaxListeners(0)
 client.options.presence = { activities: [{ name: 'Operational' }], status: PresenceUpdateStatus.Online }
 
-Promise.all([loadRoutes(web), loadEvents(client), loadCommands(client)]).then(() => {
+Promise.all([loadRoutes(web), loadEvents(client), loadCommands(client), loadInteractions(client)]).then(() => {
 	console.log("Database connecting.")
 	sequelize.authenticate().then(() => {
 		console.log("Database connected.")

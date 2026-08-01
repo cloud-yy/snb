@@ -6,7 +6,7 @@ import { pathToFileURL } from "url"
 const interactionsPath = path.join(process.cwd(), "src", "interactions")
 
 const files = fs
-	.readdirSync(commandsPath, { recursive: true })
+	.readdirSync(interactionsPath, { recursive: true })
 	.filter((file) => file.endsWith(".js"))
 
 const loadInteractions = async (client) => {

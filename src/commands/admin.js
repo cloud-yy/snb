@@ -35,9 +35,9 @@ export default {
     cooldown: 0,
 
     execute: async (interaction) => {
-        const channel = interaction.options.getChannel("channel")
+        const channel = interaction.options.getChannel("channel") || interaction.channel
 
-        channel.send({ embeds: [companyInfo] })
+        channel.send(companyInfo)
 
         return interaction.reply({ content: `Message successfully sent in <#${channel.id}>`, flags: MessageFlags.Ephemeral })
     }

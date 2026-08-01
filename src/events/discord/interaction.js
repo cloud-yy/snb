@@ -8,11 +8,11 @@ export default {
         if (!interaction.customId) return
 
         const interactionType = interaction.customId.split("_")[0]
-        const interaction = interaction.client.interactions.get(interactionType)
-        if (!interaction) return
+        const interactionModule = interaction.client.interactions.get(interactionType)
+        if (!interactionModule) return
         
         try {
-            await interaction.execute(interaction)
+            await interactionModule.execute(interaction)
         } catch (error) {
             console.error(`Error executing ${interaction.customId}:`, error)
 
