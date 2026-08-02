@@ -17,7 +17,7 @@ const loadInteractions = async (client) => {
 			const interactionModule = await import(pathToFileURL(fullPath).href)
 			const interaction = interactionModule.default
 
-			client.commands.set(interaction.id, interaction)
+			client.interactions.set(interaction.id, interaction)
 		} catch (err) {
 			console.error(`Failed to load interaction: ${file}`)
 			console.error(err)

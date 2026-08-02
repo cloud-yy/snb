@@ -26,8 +26,8 @@ export default {
                     )
                     .addChannelOption((option) =>
                         option
-                            .setName('channel')
-                            .setDescription('The channel to echo into')
+                            .setName("channel")
+                            .setDescription("The channel to echo into")
                             .addChannelTypes(ChannelType.GuildText)
                     )
         ),
@@ -37,7 +37,7 @@ export default {
     execute: async (interaction) => {
         const channel = interaction.options.getChannel("channel") || interaction.channel
 
-        channel.send(companyInfo)
+        await channel.send(companyInfo)
 
         return interaction.reply({ content: `Message successfully sent in <#${channel.id}>`, flags: MessageFlags.Ephemeral })
     }

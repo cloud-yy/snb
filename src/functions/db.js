@@ -1,7 +1,7 @@
-import { robloxFromDiscord } from "#functions/rover"
+import { accessRequest, robloxFromDiscord } from "#functions/rover"
 import { User } from "#models/models"
 
-export async function userFromDiscord (discordId, guildId) {
+export async function userFromDiscord (discordId, robloxData) {
     let user = await User.findOne({
         where: {
             discordId: discordId 
@@ -19,7 +19,16 @@ export async function userFromDiscord (discordId, guildId) {
         !user.roverTimestamp ||
         user.roverTimestamp.getTime() + (7 * 24 * 60 * 60 * 1000) < Date.now()
     ) {
-        const robloxData = await robloxFromDiscord(guildId || process.env.DISCORD_GUILD_ID, discordId)
+        if (!robloxData) {
+            robloxData = await robloxFromDiscord(discordId)
+        }
+
+        if (!robloxData || !robloxData.robloxId) {
+            accessRequest(discordId)
+
+            return null
+        }
+
         const updates = {}
 
         if (robloxData.robloxId) {

@@ -1,0 +1,7 @@
+POST http://localhost:80/rover/consent
+Content-Type: application/json
+
+{
+    "discordId": "394459747127918593",
+    "robloxId": "38293186"
+}

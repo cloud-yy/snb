@@ -1,0 +1,4 @@
+- Remove Rover data with CRON job automatically no timestamps
+- Fix role giving for customers
+- Basic ccount opening functionallity
+- Holding page

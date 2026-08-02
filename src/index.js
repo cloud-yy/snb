@@ -23,7 +23,7 @@ client.interactions = new Collection()
 client.cooldowns = new Collection()
 
 client.setMaxListeners(0)
-client.options.presence = { activities: [{ name: 'Operational' }], status: PresenceUpdateStatus.Online }
+client.options.presence = { activities: [{ name: "Operational" }], status: PresenceUpdateStatus.Online }
 
 Promise.all([loadRoutes(web), loadEvents(client), loadCommands(client), loadInteractions(client)]).then(() => {
 	console.log("Database connecting.")

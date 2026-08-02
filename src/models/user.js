@@ -23,6 +23,10 @@ export default (sequelize) => {
                 type: DataTypes.STRING
             },
 
+            roverTimestamp: {
+                type: DataTypes.DATE
+            }
+
         }, {
             indexes: [
                 { unique: true, fields: ["discordId"] },

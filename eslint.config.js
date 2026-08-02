@@ -1,11 +1,13 @@
-const js = require('@eslint/js');
+const js = require("@eslint/js");
 
 module.exports = [
 	js.configs.recommended,
 	{
 		languageOptions: {
-			ecmaVersion: 'latest',
+			ecmaVersion: "latest",
 		},
-		rules: {},
+		rules: {
+			"quotes": ["error", "double"]
+		},
 	},
 ];

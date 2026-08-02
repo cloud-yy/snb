@@ -9,8 +9,6 @@ export default {
     cooldown: 5,
 
     execute: async (interaction) => {
-        interaction.reply({ content: "Pong!", flags: MessageFlags.Ephemeral })
-
-        return
+        return interaction.reply({ content: "Pong!", flags: MessageFlags.Ephemeral })
     }
 }
