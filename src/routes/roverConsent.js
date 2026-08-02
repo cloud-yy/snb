@@ -8,9 +8,9 @@ const GUILD_ID = process.env.DISCORD_GUILD_ID
 const router = Router()
 
 router.post("/rover/consent", async (req, res) => {
-    //if (!isValidSignature) {
-    //    return res.sendStatus(418)
-    //}
+    if (!isValidSignature) {
+        return res.sendStatus(401)
+    }
 
     try {
         if (
@@ -50,7 +50,7 @@ router.post("/rover/consent", async (req, res) => {
         console.error(error)
     }
 
-    res.sendStatus(200)
+    return res.sendStatus(200)
 })
 
 export default router

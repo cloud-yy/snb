@@ -1,5 +1,6 @@
 import { Client, Events, GatewayIntentBits, Partials, Collection, ActivityType, PresenceUpdateStatus } from "discord.js"
 import express from "express"
+import path from "path"
 
 import loadEvents from "#functions/loaders/loadEvents"
 import loadCommands from "#functions/loaders/loadCommands"
@@ -12,6 +13,7 @@ const { User, Message, GuildMember, ThreadMember } = Partials
 
 const web = express()
 web.use(express.json())
+web.use(express.static(path.join(process.cwd(), 'public')))
 
 const client = new Client({
 	intents: [Guilds, GuildMembers, GuildMessages, MessageContent, DirectMessages, GuildPresences],
