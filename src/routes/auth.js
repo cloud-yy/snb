@@ -14,10 +14,6 @@ const TOKEN_URL = "https://apis.roblox.com/oauth/v1/token"
 const USERINFO_URL = "https://apis.roblox.com/oauth/v1/userinfo"
 
 const ERROR_MESSAGE = "OAuth error: we were unable to log you in, please try again and if error persists contact staff."
-const CLOSE_TAB =
-`<script>
-    window.close();
-</script>`
 
 const authStates = new Map()
 
@@ -123,7 +119,7 @@ router.get("/auth/roblox/callback", async (req, res) => {
             }
         }
 
-        return res.send(`Roblox account linked successfully! ${CLOSE_TAB}`)
+        return res.redirect("https://discord.gg/WMnARgngkr")
     } catch (error) {
         console.error(error)
         return res.status(500).send(ERROR_MESSAGE)
