@@ -2,3 +2,4 @@
 - Fix role giving for customers
 - Basic ccount opening functionallity
 - Holding page
+- Manage images in git (git lfs?)
