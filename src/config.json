@@ -1,0 +1,13 @@
+{
+    "accounts": {
+        "General": {
+            "type": "personal"
+        },
+
+        "Business": {
+            "type": "business"
+        }
+    },
+
+    "currencies": ["HC$", "RW$", "CC$"]
+}

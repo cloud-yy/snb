@@ -12,7 +12,8 @@
     "#functions/*": "./src/functions/*.js",
     "#models/*": "./src/models/*.js",
     "#utils/*": "./src/utils/*.js",
-    "#root/*": "./src/*.js"
+    "#root/*": "./src/*.js",
+    "#config": "./src/config.json"
   },
   "dependencies": {
     "@sequelize/postgres": "^7.0.0-alpha.48",

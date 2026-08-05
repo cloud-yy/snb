@@ -24,12 +24,12 @@ export const auditLog = (sequelize) => {
             },
 
             accountId: {
-                type: DataTypes.INTEGER,
+                type: DataTypes.BIGINT,
                 allowNull: false
             },
 
             userId: {
-                type: DataTypes.INTEGER,
+                type: DataTypes.BIGINT,
                 allowNull: false
             },
 
@@ -55,13 +55,13 @@ export const ledger = (sequelize) => {
                 autoIncrement: true
             },
 
-            payor: {
-                type: DataTypes.INTEGER,
+            payorId: {
+                type: DataTypes.BIGINT,
                 allowNull: false
             },
 
-            payee: {
-                type: DataTypes.INTEGER,
+            payeeId: {
+                type: DataTypes.BIGINT,
                 allowNull: false
             },
 
@@ -92,16 +92,16 @@ export const ledger = (sequelize) => {
             },
 
             standingOrderId: {
-                type: DataTypes.INTEGER
+                type: DataTypes.BIGINT
             },
 
             externalTransferId: {
-                type: DataTypes.INTEGER
+                type: DataTypes.BIGINT
             },
         }, {
             indexes: [
-                { fields: ["payor", "time"] },
-                { fields: ["payee", "time"] }
+                { fields: ["payorId", "time"] },
+                { fields: ["payeeId", "time"] }
             ]
         }
     )

@@ -1,4 +1,4 @@
-import { userFromDiscord } from "#functions/db"
+import { userFromDiscord } from "#functions/db/user"
 import { MessageFlags, SlashCommandBuilder } from "discord.js"
 
 export default {

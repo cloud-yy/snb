@@ -5,7 +5,7 @@ export const user = (sequelize) => {
         "user",
         {
             id: {
-                type: DataTypes.INTEGER,
+                type: DataTypes.BIGINT,
                 primaryKey: true,
                 autoIncrement: true
             },
@@ -45,7 +45,7 @@ export const account = (sequelize) => {
         "account",
         {
             id: {
-                type: DataTypes.INTEGER,
+                type: DataTypes.BIGINT,
                 primaryKey: true,
                 autoIncrement: true
             },
@@ -79,23 +79,23 @@ export const accountAccess = (sequelize) => {
         "accountAccess",
         {
             id: {
-                type: DataTypes.INTEGER,
+                type: DataTypes.BIGINT,
                 primaryKey: true,
                 autoIncrement: true
             },
 
             accountId: {
-                type: DataTypes.INTEGER,
+                type: DataTypes.BIGINT,
                 allowNull: false
             },
 
             userId: {
-                type: DataTypes.INTEGER,
+                type: DataTypes.BIGINT,
                 allowNull: false
             },
 
             access: {
-                type: DataTypes.INTEGER,
+                type: DataTypes.TEXT,
                 allowNull: false
             }
         }, {
@@ -112,13 +112,13 @@ export const accountBalance = (sequelize) => {
         "accountBalance",
         {
             id: {
-                type: DataTypes.INTEGER,
+                type: DataTypes.BIGINT,
                 primaryKey: true,
                 autoIncrement: true
             },
 
             accountId: {
-                type: DataTypes.INTEGER,
+                type: DataTypes.BIGINT,
                 allowNull: false
             },
 

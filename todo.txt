@@ -1,6 +1,4 @@
 - Remove Rover data with CRON job automatically no timestamps
-- Fix role giving for customers
+- Rewrite signup functionallity (Fix role giving for customers)
 - Basic account opening functionallity
 - Holding page
-- Manage images in git (git lfs?)
-- Fix data, learn sequalize, simplify, as statements and column names
