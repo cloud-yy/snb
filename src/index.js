@@ -32,7 +32,7 @@ Promise.all([loadRoutes(web), loadEvents(client), loadCommands(client), loadInte
 	sequelize.authenticate().then(() => {
 		console.log("Database connected.")
 
-		sequelize.sync({ alter: false }).then(() => {
+		sequelize.sync({ alter: process.env.POSTGRES_ALTER, force: process.env.POSTGRES_FORCE }).then(() => {
 			console.log("Database synced.")
 
 			console.log("Logging in.")
@@ -47,4 +47,4 @@ Promise.all([loadRoutes(web), loadEvents(client), loadCommands(client), loadInte
 	})
 })
 
-export { client }
+export { client, web }
