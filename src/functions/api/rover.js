@@ -22,7 +22,7 @@ export async function robloxFromDiscord (userId, guidId = GUILD_ID) {
         const response = await api.get(`/guilds/${guidId}/discord-to-roblox/${userId}`)
         
         return response.data
-    } catch(error) {
+    } catch (error) {
         if (error.response) {
             console.error(`Request Error [${error.response.status}]:`, error.response.data.message || error.response.data);
         } else if (error.request) {
