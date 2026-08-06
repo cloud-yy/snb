@@ -13,6 +13,6 @@ export default {
             return interaction.followUp({ content: "Additional verification needed, please check your DMs from Rover.", flags: MessageFlags.Ephemeral })
         }
 
-        return interaction.followUp({ content: "Your user profile setup has bee successful!", flags: MessageFlags.Ephemeral })
+        return interaction.followUp({ content: "Your user profile has been successfully created!", flags: MessageFlags.Ephemeral })
     }
 }

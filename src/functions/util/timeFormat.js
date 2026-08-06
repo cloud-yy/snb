@@ -1,4 +1,4 @@
-export function hhmmss(duration) {
+export async function hhmmss(duration) {
   const hrs = ~~(duration / 3600)
   const mins = ~~((duration % 3600) / 60)
   const secs = ~~duration % 60

@@ -7,7 +7,7 @@ const files = fs
     .readdirSync(routesPath, {recursive: true})
     .filter((file) => file.endsWith(".js"))
 
-const loadRoutes = async (web) => {
+export default async function (web) {
     for (const file of files) {
         const fullPath = path.join(routesPath, file)
 
@@ -24,5 +24,3 @@ const loadRoutes = async (web) => {
 
     console.log("Routes loaded.")
 }
-
-export default loadRoutes

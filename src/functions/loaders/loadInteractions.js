@@ -9,7 +9,7 @@ const files = fs
 	.readdirSync(interactionsPath, { recursive: true })
 	.filter((file) => file.endsWith(".js"))
 
-const loadInteractions = async (client) => {
+export default async function (client) {
 	for (const file of files) {
 		const fullPath = path.join(interactionsPath, file);
 
@@ -25,6 +25,4 @@ const loadInteractions = async (client) => {
 	}
 
     console.log("Interactions loaded.")
-};
-
-export default loadInteractions
+}

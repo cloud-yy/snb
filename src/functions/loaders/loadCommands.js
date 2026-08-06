@@ -9,7 +9,7 @@ const files = fs
 	.readdirSync(commandsPath, { recursive: true })
 	.filter((file) => file.endsWith(".js"))
 
-const loadCommands = async (client) => {
+export default async function (client) {
 	for (const file of files) {
 		const fullPath = path.join(commandsPath, file);
 
@@ -29,6 +29,4 @@ const loadCommands = async (client) => {
 	}
 
     console.log("Commands loaded.")
-};
-
-export default loadCommands;
+}

@@ -8,7 +8,7 @@ const files = fs
     .readdirSync(eventsPath, {recursive: true})
     .filter((file) => file.endsWith(".js"))
 
-const loadEvents = async (client) => {
+export default async function (client) {
     for (const file of files) {
         const fullPath = path.join(eventsPath, file)
 
@@ -34,5 +34,3 @@ const loadEvents = async (client) => {
 
     console.log("Events loaded.")
 }
-
-export default loadEvents
