@@ -13,12 +13,14 @@
     "#models/*": "./src/models/*.js",
     "#utils/*": "./src/utils/*.js",
     "#root/*": "./src/*.js",
-    "#config": "./src/config.json"
+    "#config": "./src/config.json",
+    "#index": "./src/index.js"
   },
   "dependencies": {
     "@sequelize/postgres": "^7.0.0-alpha.48",
     "ascii-table": "^0.0.9",
     "axios": "^1.13.2",
+    "axios-rate-limit": "^1.9.0",
     "discord.js": "^14.24.2",
     "express": "^5.1.0",
     "import": "^0.0.6",

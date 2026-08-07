@@ -14,6 +14,11 @@ export const user = (sequelize) => {
                 type: DataTypes.TEXT
             },
 
+            role: {
+                type: DataTypes.TEXT,
+                default: "Customer"
+            },
+
             discordId: {
                 type: DataTypes.STRING,
                 unique: true

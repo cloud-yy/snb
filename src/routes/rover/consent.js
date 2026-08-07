@@ -1,6 +1,6 @@
 import { userFromDiscord } from "#functions/db"
 import { Router } from "express"
-import { client } from "#root/index"
+import { client } from "#index"
 import isValidSignature from "#functions/util/isValidSignature"
 
 const GUILD_ID = process.env.DISCORD_GUILD_ID

@@ -1,4 +1,4 @@
-import { accessRequest, robloxFromDiscord } from "#functions/api/rover"
+import { accessRequest, robloxFromDiscord } from "#functions/util/rover"
 import { User } from "#models/models"
 
 export async function userFromDiscord (discordId, robloxData) {
