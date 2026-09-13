@@ -130,7 +130,7 @@ export const accountBalance = (sequelize) => {
             balance: {
                 type: DataTypes.BIGINT,
                 allowNull: false,
-                default: 0
+                defaultValue: 0
             },
 
             currency: {
