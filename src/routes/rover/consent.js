@@ -1,4 +1,4 @@
-import { userFromDiscord } from "#functions/db"
+import { userFromDiscord } from "#functions/db/user"
 import { Router } from "express"
 import { client } from "#index"
 import isValidSignature from "#functions/util/isValidSignature"
