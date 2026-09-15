@@ -1,4 +1,5 @@
 import { accessRequest, robloxFromDiscord } from "#functions/util/rover"
+import { updateRoles } from "#functions/util/updateRoles"
 import { User } from "#models/models"
 
 export async function userFromDiscord (discordId, robloxData) {
@@ -11,7 +12,6 @@ export async function userFromDiscord (discordId, robloxData) {
     if (!user) {
         user = await User.create({
             discordId: discordId
-            
         })
     }
 
@@ -45,6 +45,8 @@ export async function userFromDiscord (discordId, robloxData) {
             await user.update(updates)
         }
     }
+
+    await updateRoles(user)
 
     return user
 }

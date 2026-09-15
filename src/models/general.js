@@ -11,7 +11,8 @@ export const user = (sequelize) => {
             },
 
             status: {
-                type: DataTypes.TEXT
+                type: DataTypes.TEXT,
+                defaultValue: "ACTIVE"
             },
 
             role: {

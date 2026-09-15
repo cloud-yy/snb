@@ -13,7 +13,7 @@ export async function createAccount(owner, type = "General", name) {
     try {
         const result = sequelize.transaction(async transaction => {
             const account = await Account.create({
-                status: "Active",
+                status: "ACTIVE",
                 type,
                 name
             }, {transaction})
