@@ -11,6 +11,7 @@ export async function userFromDiscord (discordId, robloxData) {
     if (!user) {
         user = await User.create({
             discordId: discordId
+            
         })
     }
 
