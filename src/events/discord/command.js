@@ -5,45 +5,55 @@ export default {
     once: false,
 
     async execute(interaction) {
-        if (!interaction.isChatInputCommand()) return
+        if (interaction.isChatInputCommand()) {
 
-        const command = interaction.client.commands.get(interaction.commandName)
-        if (!command) return
+            const command = interaction.client.commands.get(interaction.commandName)
+            if (!command) return
 
-        if (command.cooldown) {
-            const cooldowns = interaction.client.cooldowns
+            if (command.cooldown) {
+                const cooldowns = interaction.client.cooldowns
 
-            const now = Date.now()
-            const timestamps = cooldowns.get(command.name)
-            const cooldown = (command.cooldown) * 1000
-            const userId = interaction.user.id
+                const now = Date.now()
+                const timestamps = cooldowns.get(command.name)
+                const cooldown = (command.cooldown) * 1000
+                const userId = interaction.user.id
 
-            if (timestamps.has(userId)) {
-                const expiration = timestamps.get(userId) + cooldown
+                if (timestamps.has(userId)) {
+                    const expiration = timestamps.get(userId) + cooldown
 
-                if (now < expiration) {
-                    const expirationTime = Math.round(expiration / 1000)
+                    if (now < expiration) {
+                        const expirationTime = Math.round(expiration / 1000)
 
-                    return interaction.reply({ content: `This command is on cooldown, you can use it again <t:${expirationTime}:R>`, flags: MessageFlags.Ephemeral })
+                        return interaction.reply({ content: `This command is on cooldown, you can use it again <t:${expirationTime}:R>`, flags: MessageFlags.Ephemeral })
+                    }
+                }
+
+                timestamps.set(userId, now)
+                setTimeout(() => timestamps.delete(userId), cooldown)
+            }
+            
+            try {
+                await command.execute(interaction)
+            } catch (error) {
+                console.error(`Error executing ${interaction.commandName}:`, error)
+
+                const errorMessage = { content: "There was an error executing this command!", flags: MessageFlags.Ephemeral };
+            
+                if (interaction.replied || interaction.deferred) {
+                    await interaction.followUp(errorMessage);
+                } else {
+                    await interaction.reply(errorMessage);
                 }
             }
+        } else if (interaction.isAutocomplete()) {
+            const command = interaction.client.commands.get(interaction.commandName)
+            if (!command) return
 
-            timestamps.set(userId, now)
-            setTimeout(() => timestamps.delete(userId), cooldown)
-        }
-        
-        try {
-            await command.execute(interaction)
-        } catch (error) {
-            console.error(`Error executing ${interaction.commandName}:`, error)
-
-            const errorMessage = { content: "There was an error executing this command!", flags: MessageFlags.Ephemeral };
-        
-            if (interaction.replied || interaction.deferred) {
-                await interaction.followUp(errorMessage);
-            } else {
-                await interaction.reply(errorMessage);
+            try {
+                await command.autocomplete(interaction)
+            } catch (error) {
+                console.error(`Error autocompleting ${interaction.commandName}:`, error)
             }
         }
-    }
+    } 
 }
