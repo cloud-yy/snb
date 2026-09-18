@@ -37,16 +37,17 @@ export default {
             } catch (error) {
                 console.error(`Error executing ${interaction.commandName}:`, error)
 
-                const errorMessage = { content: "There was an error executing this command!", flags: MessageFlags.Ephemeral };
+                const errorMessage = { content: "There was an error executing this command!", flags: MessageFlags.Ephemeral }
             
                 if (interaction.replied || interaction.deferred) {
-                    await interaction.followUp(errorMessage);
+                    await interaction.followUp(errorMessage)
                 } else {
-                    await interaction.reply(errorMessage);
+                    await interaction.reply(errorMessage)
                 }
             }
         } else if (interaction.isAutocomplete()) {
             const command = interaction.client.commands.get(interaction.commandName)
+
             if (!command) return
 
             try {

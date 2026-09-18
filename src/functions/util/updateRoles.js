@@ -1,15 +1,16 @@
 import { client } from "#index"
 
-const GUILD_ID = process.env.GUILD_ID
+let Guild
+let Roles
 
 export async function giveRoleByName(member, roleName) {
-    const role = await guild.roles.cache.find(role => role.name === roleName)
+    const role = await Roles.find(role => role.name === roleName)
 
     if (!role) {
-        return
+        return console.log(`${roleName} not found.`)
     }
 
-    if (!member.roles.cache.has(role.id)) {
+    if (member.roles.cache.has(role.id)) {
         return
     }
 
@@ -17,16 +18,18 @@ export async function giveRoleByName(member, roleName) {
 }
 
 export async function updateRoles(user) {
-    const guild = await client.guilds.cache.get(GUILD_ID)
+    if (!Guild) {
+        Guild = await client.guilds.fetch(process.env.DISCORD_GUILD_ID)
+    }
 
-    if (!guild) {
-        return
+    if (!Roles) {
+        Roles = await Guild.roles.fetch()
     }
     
-    const member = await guild.members.cache.get(user.discordId)
+    const member = await Guild.members.fetch(user.discordId)
 
     if (!member) {
-        return
+        return console.log("Member not found.")
     }
     
     giveRoleByName(member, "✔️")

@@ -1,6 +1,7 @@
 import { accessRequest, robloxFromDiscord } from "#functions/util/rover"
 import { updateRoles } from "#functions/util/updateRoles"
 import { User } from "#models/models"
+import { Op } from "sequelize"
 
 export async function userFromDiscord (discordId, robloxData) {
     let user = await User.findOne({
@@ -49,4 +50,19 @@ export async function userFromDiscord (discordId, robloxData) {
     await updateRoles(user)
 
     return user
+}
+
+export async function userFromDiscordExternal (discordId) {
+    let user = await User.findOne({
+        where: {
+            discordId: discordId,
+            robloxId: { [Op.not]: null }
+        }
+    })
+
+    if (user) {
+        return user
+    }
+
+    return null
 }

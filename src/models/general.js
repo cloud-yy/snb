@@ -57,24 +57,29 @@ export const account = (sequelize) => {
             },
 
             status: {
-                type: DataTypes.TEXT
+                type: DataTypes.TEXT,
+                allowNull: false
             },
 
             type: {
-                type: DataTypes.TEXT
+                type: DataTypes.TEXT,
+                allowNull: false
             },
 
             name: {
-                type: DataTypes.TEXT
+                type: DataTypes.TEXT,
+                allowNull: false
             },
 
-            accountNumber: {
-                type: DataTypes.BIGINT,
-                unique: true
+            number: {
+                type: DataTypes.TEXT,
+                unique: true,
+                allowNull: false
             }
         }, {
             indexes: [
-                { unique: true, fields: ["accountNumber"] }
+                { unique: true, fields: ["number"] },
+                { unique: false, fields: ["name"] }
             ]
         }
     )

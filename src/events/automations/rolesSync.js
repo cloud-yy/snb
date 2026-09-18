@@ -12,6 +12,10 @@ export default {
             return
         }
 
-        await Promise.all(users.map(async (user) => updateRoles(user)))
+        try {
+            await Promise.all(users.map(async (user) => updateRoles(user)))
+        } catch (error) {
+            console.error("Failed to update roles.")
+        }
     }
 }

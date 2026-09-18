@@ -21,31 +21,7 @@ router.post("/rover/consent", async (req, res) => {
             return
         }
 
-        const user = await userFromDiscord(req.body.discordId, req.body)
-
-        if (!user.discordId) {
-            return
-        }
-
-        const guild = await client.guilds.cache.get(GUILD_ID)
-
-        if (!guild) {
-            return
-        }
-
-        const role = await guild.roles.cache.find(r => r.name === "Customer")
-
-        if (!role) {
-            return
-        }
-
-        const member = await guild.members.fetch(user.discordId)
-
-        if (!member) {
-            return
-        }
-
-        await member.roles.add(role)
+        await userFromDiscord(req.body.discordId, req.body)
     } catch (error) {
         console.error(error)
     }

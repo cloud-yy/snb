@@ -7,6 +7,7 @@ export default {
             .setDescription("Ping command to test the bot"),
 
     cooldown: 5,
+    scope: "global",
 
     execute: async (interaction) => {
         return interaction.reply({ content: "Pong!", flags: MessageFlags.Ephemeral })
