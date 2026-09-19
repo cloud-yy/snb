@@ -1,6 +1,7 @@
 import { Sequelize } from "sequelize"
 
-import { user, account, accountAccess, accountBalance } from "#models/general"
+import { user } from "#models/user"
+import { account, accountAccess, accountBalance } from "#models/general"
 import { auditLog, ledger } from "#models/logging"
 
 const sequelize = new Sequelize(process.env.POSTGRES_URI, {

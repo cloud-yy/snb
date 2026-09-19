@@ -1,4 +1,4 @@
-- Remove Rover data with CRON job automatically no timestamps
-- Rewrite signup functionallity (Fix role giving for customers)
-- Basic account opening functionallity
+- Make deposits more robust with more info (create nonexisting balances)
+- embeds/formatting improvements
+- user commands to view accounts
 - Holding page

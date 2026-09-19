@@ -6,6 +6,10 @@
 
         "Business": {
             "type": "business"
+        },
+
+        "Reserve": {
+            "type": "reserve"
         }
     },
 

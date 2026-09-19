@@ -32,13 +32,9 @@ export const auditLog = (sequelize) => {
                 type: DataTypes.BIGINT,
                 allowNull: false
             },
-
-            time: {
-                type: DataTypes.DATE
-            }
         }, {
             indexes: [
-                { fields: ["accountId", "time"] },
+                { fields: ["accountId", "createdAt"] },
                 { fields: ["userId"] }
             ]
         }
@@ -75,23 +71,26 @@ export const ledger = (sequelize) => {
                 allowNull: false
             },
 
-            time: {
-                type: DataTypes.DATE
-            },
-
             status: {
-                type: DataTypes.TEXT
+                type: DataTypes.TEXT,
+                allowNull: false
             },
 
             type: {
-                type: DataTypes.TEXT
+                type: DataTypes.TEXT,
+                allowNull: false
             },
 
             reference: {
-                type: DataTypes.TEXT
+                type: DataTypes.TEXT,
+                allowNull: false
             },
 
             standingOrderId: {
+                type: DataTypes.BIGINT
+            },
+
+            directDebitId: {
                 type: DataTypes.BIGINT
             },
 
@@ -100,8 +99,8 @@ export const ledger = (sequelize) => {
             },
         }, {
             indexes: [
-                { fields: ["payorId", "time"] },
-                { fields: ["payeeId", "time"] }
+                { fields: ["payorId", "createdAt"] },
+                { fields: ["payeeId", "createdAt"] }
             ]
         }
     )

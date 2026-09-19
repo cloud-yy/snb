@@ -1,9 +1,11 @@
 import { ChannelType, MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from "discord.js"
-import { Account } from "#models/models"
+import { Account, AccountBalance, AuditLog, Ledger, sequelize, User } from "#models/models"
 import companyInfo from "#functions/templates/companyInfo"
 import config from "#config" with { type: 'json' }
 import { Op } from "sequelize"
 import formatAccountNumber from "#functions/util/formatAccountNumber"
+import { createAccount } from "#functions/db/account"
+import { userFromDiscord } from "#functions/db/user"
 
 export default {
     command: 
@@ -43,7 +45,33 @@ export default {
                             .setRequired(true)
                             .addChoices(config.currencies.map(currency => ({ name: currency, value: currency })))
                     )
-                )
+            )
+
+            .addSubcommand((subcommand) =>
+                subcommand
+                    .setName("open")
+                    .setDescription("Opens an account")
+                    .addStringOption((option) =>
+                        option
+                            .setName("type")
+                            .setDescription("The type of the account")
+                            .setRequired(true)
+                            .addChoices(
+                                Object.keys(config.accounts).map(name => ({ name: name, value: name }))
+                            )
+                    )
+                    .addUserOption((option) =>
+                        option
+                            .setName("holder")
+                            .setDescription("The account holders")
+                            .setRequired(true)
+                    )
+                    .addStringOption((option) =>
+                        option
+                            .setName("name")
+                            .setDescription("The optional account name")
+                    )
+            )
 
             .addSubcommand((subcommand) =>
                 subcommand
@@ -52,13 +80,13 @@ export default {
                     .addStringOption((option) =>
                         option
                             .setName("embed")
-                            .setDescription("The name of the embed you want to send.")
+                            .setDescription("The name of the embed you want to send")
                             .setRequired(true)
                             .addChoices(
-                                { name: "companyInfo", value: "companyInfo" },
-                                { name: "register", value: "register" },
-                                { name: "openAccount", value: "openAccount" },
-                                { name: "accountOptions", value: "accountOptions" }
+                                { name: "Company Info", value: "companyInfo" },
+                                { name: "Register Prompt", value: "register" },
+                                { name: "Open Account", value: "openAccount" },
+                                { name: "Account Options", value: "accountOptions" }
                             )
                     )
             ),
@@ -79,9 +107,85 @@ export default {
             }
 
             case "deposit": {
-                console.log(interaction.options.data)
+                const reserve = interaction.options.getString("reserve")
+                const account = interaction.options.getString("account")
+                const amount = interaction.options.getInteger("amount")
+                const currency = interaction.options.getString("currency")
 
-                return interaction.reply({ content: `hello hello!`, flags: MessageFlags.Ephemeral })
+                try {
+                    await sequelize.transaction(async transaction => {
+                        await AccountBalance.increment("balance", {
+                            by: -amount,
+                            where: {
+                                accountId: reserve,
+                                currency
+                            },
+                            transaction
+                        })
+
+                        await AccountBalance.increment("balance", {
+                            by: amount,
+                            where: {
+                                accountId: account,
+                                currency
+                            },
+                            transaction
+                        })
+
+                        await Ledger.create({
+                            payorId: reserve,
+                            payeeId: account,
+                            amount,
+                            currency,
+                            status: "SUCCESS",
+                            type: "DEPOSIT",
+                            reference: "ACCOUNT DEPOSIT"
+                        }, { transaction })
+
+                        const user = await User.findOne({
+                            where: { discordId: interaction.user.id }
+                        }, { transaction })
+
+                        if (!user) {
+                            throw new Error("User not found.")
+                        }
+
+                        await AuditLog.create({
+                            action: {
+                                type: "DEPOSIT"
+                            },
+                            before: null,
+                            after:  {"balance": amount, currency: currency},
+                            accountId: reserve,
+                            userId: user.id
+                        }, { transaction })
+                    })
+
+                    return interaction.reply({ content: `Success!\n${currency}${amount} has been deposited!`, flags: MessageFlags.Ephemeral })
+                } catch (error) {
+                    console.error("Failed to deposit!", error)
+                    return interaction.reply({ content: "There was an error running this database transaction.", flags: MessageFlags.Ephemeral })
+                }
+            }
+
+            case "open": {
+                const type = interaction.options.getString("type")
+                const holder = interaction.options.getUser("holder")
+                const name = interaction.options.getString("name")
+
+                const user = await userFromDiscord(holder.id)
+
+                if (!user) {
+                    return interaction.reply({ content: "Unable to find user in database, they may not be setup yet.", flags: MessageFlags.Ephemeral }) 
+                }
+
+                const account = await createAccount(user, type, name)
+
+                if (!account) {
+                    return interaction.reply({ content: "There as an error making this account.", flags: MessageFlags.Ephemeral }) 
+                }
+
+                return interaction.reply({ content: `Account Created\nName: ${account.name}\nNumber: ${formatAccountNumber(account.number)}\nType: ${account.type}\nStatus: ${account.status}`, flags: MessageFlags.Ephemeral }) 
             }
         }
     },
@@ -101,7 +205,7 @@ export default {
                     limit: 25
                 })
 
-		        await interaction.respond(accounts.map(account => ({ name: `${account.name} [${formatAccountNumber(account.number)}]`, value: account.number })))
+		        await interaction.respond(accounts.map(account => ({ name: `${account.name} - ${account.type} - (${formatAccountNumber(account.number)})`, value: account.id })))
             }
         }
     }
