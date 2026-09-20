@@ -1,4 +1,3 @@
-- Make deposits more robust with more info (create nonexisting balances)
 - embeds/formatting improvements
 - user commands to view accounts
 - Holding page

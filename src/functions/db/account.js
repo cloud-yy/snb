@@ -27,7 +27,7 @@ export async function createAccount(owner, type = "General", chosenName) {
                     access: "Holder"
                 }, {transaction})
             }
-
+            /*
             await AccountBalance.bulkCreate(
                 config.currencies.map(currency => ({
                     accountId: account.id,
@@ -35,7 +35,7 @@ export async function createAccount(owner, type = "General", chosenName) {
                     balance: 0
                 })), {transaction}
             )
-
+            */
             await AuditLog.create({
                 accountId: account.id,
                 userId: owner.id,

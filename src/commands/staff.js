@@ -6,6 +6,7 @@ import { Op } from "sequelize"
 import formatAccountNumber from "#functions/util/formatAccountNumber"
 import { createAccount } from "#functions/db/account"
 import { userFromDiscord } from "#functions/db/user"
+import { accountBalance } from "#models/general"
 
 export default {
     command: 
@@ -113,22 +114,36 @@ export default {
                 const currency = interaction.options.getString("currency")
 
                 try {
-                    await sequelize.transaction(async transaction => {
-                        await AccountBalance.increment("balance", {
-                            by: -amount,
-                            where: {
-                                accountId: reserve,
+                    const [oldReserveBalance, newReserveBalance, oldAccountBalance, newAccountBalance] = await sequelize.transaction(async transaction => {
+                        const [reserveBalance, reserveCreated] = await AccountBalance.findOrCreate({
+                            where: { accountId: reserve },
+                            defaults: {
+                                balance: 0,
                                 currency
                             },
                             transaction
                         })
 
-                        await AccountBalance.increment("balance", {
-                            by: amount,
-                            where: {
-                                accountId: account,
+                        const oldReserveBalance = reserveBalance.balance
+
+                        await reserveBalance.increment("balance", {
+                            by: -amount,
+                            transaction
+                        })
+
+                        const [accountBalance, accountCreated] = await AccountBalance.findOrCreate({
+                            where: { accountId: account },
+                            defaults: {
+                                balance: 0,
                                 currency
                             },
+                            transaction
+                        })
+
+                        const oldAccountBalance = accountBalance.balance
+
+                        await accountBalance.increment("balance", {
+                            by: amount,
                             transaction
                         })
 
@@ -150,18 +165,25 @@ export default {
                             throw new Error("User not found.")
                         }
 
+                        await reserveBalance.reload({ transaction })
+                        await accountBalance.reload({ transaction })
+
                         await AuditLog.create({
                             action: {
-                                type: "DEPOSIT"
+                                type: "DEPOSIT",
+                                amount,
+                                currency
                             },
-                            before: null,
-                            after:  {"balance": amount, currency: currency},
+                            before: { balance: oldReserveBalance, currency: currency },
+                            after:  { balance: reserveBalance.balance, currency: currency },
                             accountId: reserve,
                             userId: user.id
                         }, { transaction })
+
+                        return [oldReserveBalance, reserveBalance.balance, oldAccountBalance, accountBalance.balance]
                     })
 
-                    return interaction.reply({ content: `Success!\n${currency}${amount} has been deposited!`, flags: MessageFlags.Ephemeral })
+                    return interaction.reply({ content: `Success!\n${currency}${amount} has been deposited!\nReserve: ${currency}${oldReserveBalance} >>> ${currency}${newReserveBalance}\nAccount: ${currency}${oldAccountBalance} >>> ${currency}${newAccountBalance}`, flags: MessageFlags.Ephemeral })
                 } catch (error) {
                     console.error("Failed to deposit!", error)
                     return interaction.reply({ content: "There was an error running this database transaction.", flags: MessageFlags.Ephemeral })
@@ -196,10 +218,18 @@ export default {
 		switch(focused.name) {
             case "account":
             case "reserve": {
+                const reserveOnly = focused.name === "reserve"
+
                 const accounts = await Account.findAll({
-                    where: {[Op.or]: [
-                        { number: { [Op.like]: `%${focused.value}%` } },
-                        { name: { [Op.like]: `%${focused.value}%` } }
+                    where: {[Op.and]: [
+                        {[Op.or]: [
+                            { number: { [Op.like]: `%${focused.value}%` } },
+                            { name: { [Op.like]: `%${focused.value}%` } }
+                        ]},
+                        
+                        reserveOnly
+                            ? { type: "Reserve" }
+                            : { type: { [Op.ne]: "Reserve" } }
                     ]},
 
                     limit: 25
