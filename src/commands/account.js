@@ -4,6 +4,8 @@ import config from "#config" with { type: 'json' }
 import { Op } from "sequelize"
 import formatAccountNumber from "#functions/util/formatAccountNumber"
 import formatCurrency from "#functions/util/formatCurrency"
+import { accountFromNumber, transfer } from "#functions/db/account"
+import { userFromDiscord } from "#functions/db/user"
 
 export default {
     command: 
@@ -119,82 +121,30 @@ export default {
                 const reference = interaction.options.getString("reference") || "Transfer"
                 const show = interaction.options.getBoolean("show")
 
-                const amount = Math.round(rawAmount * 100) / 100
+                const fromAccount = await accountFromNumber(from)
 
-                const [fromBalance, fromCreated] = await AccountBalance.findOrCreate({
-                    where: { accountId: from },
-                    defaults: {
-                        balance: 0,
-                        currency
-                    }
-                })
+                if (!fromAccount) {
+                    return interaction.reply({ content: "Sending account not found!", flags: MessageFlags.Ephemeral })
+                }
 
-                if (amount > fromBalance.balance) {
-                    return interaction.reply({ content: `Not enough money!\nYou have ${currency} ${formatCurrency(fromBalance.balance)}\nYou need ${currency} ${formatCurrency(amount - fromBalance.balance)}`, flags: MessageFlags.Ephemeral }) 
+                const toAccount = await accountFromNumber(to)
+
+                if (!toAccount) {
+                    return interaction.reply({ content: "Receiving account not found!", flags: MessageFlags.Ephemeral })
+                }
+
+                const user = userFromDiscord(interaction.user.id)
+
+                if (!user) {
+                    return interaction.reply({ content: "Your user profile has not been found!", flags: MessageFlags.Ephemeral })
                 }
 
                 try {
-                    const [oldFromBalance, newFromBalance, oldToBalance, newToBalance] = await sequelize.transaction(async transaction => {
-                        const oldFromBalance = fromBalance.balance
+                    const ledger = await transfer(fromAccount, toAccount, rawAmount, currency, reference, user, false)
 
-                        await fromBalance.increment("balance", {
-                            by: -amount,
-                            transaction
-                        })
-
-                        const [toBalance, toCreated] = await AccountBalance.findOrCreate({
-                            where: { accountId: to },
-                            defaults: {
-                                balance: 0,
-                                currency
-                            },
-                            transaction
-                        })
-
-                        const oldToBalance = toBalance.balance
-
-                        await toBalance.increment("balance", {
-                            by: amount,
-                            transaction
-                        })
-
-                        await Ledger.create({
-                            payorId: from,
-                            payeeId: to,
-                            amount,
-                            currency,
-                            status: "SUCCESS",
-                            type: "TRANSFER",
-                            reference
-                        }, { transaction })
-
-                        const user = await User.findOne({
-                            where: { discordId: interaction.user.id }
-                        }, { transaction })
-
-                        if (!user) {
-                            throw new Error("User not found.")
-                        }
-
-                        await AuditLog.create({
-                            action: {
-                                type: "TRANSFER",
-                                amount,
-                                currency
-                            },
-                            before: { balance: oldFromBalance, currency: currency },
-                            after:  { balance: fromBalance.balance, currency: currency },
-                            accountId: from,
-                            userId: user.id
-                        }, { transaction })
-
-                        return [oldFromBalance, fromBalance.balance, oldToBalance, toBalance.balance]
-                    })
-
-                    return interaction.reply({ content: `Success!\n${currency} ${formatCurrency(amount)} has been been transfered!`,flags: show ? undefined : MessageFlags.Ephemeral })
+                    return interaction.reply({ content: `Success!\n${currency} ${formatCurrency(amount)} has been been transfered!\n${formatAccountNumber(from)} > ${formatAccountNumber(to)}`,flags: show ? undefined : MessageFlags.Ephemeral })
                 } catch (error) {
-                    console.error(error)
-                    return interaction.reply({ content: "There was an error during this transfer, no money has been moved. Please contact support if this issue persists.", flags: MessageFlags.Ephemeral })
+                    return interaction.reply({ content: `There was an error during this transfer, no money has been moved. Please contact support if this issue persists.\n${error}`, flags: MessageFlags.Ephemeral })
                 }
             }
         }
@@ -216,7 +166,7 @@ export default {
                     limit: 25
                 })
 
-		        return await interaction.respond(accounts.map(account => ({ name: `${account.name} - ${account.type} - (${formatAccountNumber(account.number)})`, value: account.id })))
+		        return await interaction.respond(accounts.map(account => ({ name: `${account.name} - ${account.type} - (${formatAccountNumber(account.number)})`, value: account.number })))
             case "from":
             case "account": {
                 const accounts = await Account.findAll({
@@ -237,7 +187,7 @@ export default {
                     limit: 25
                 })
 
-		        return await interaction.respond(accounts.map(account => ({ name: `${account.name} - ${account.type} - (${formatAccountNumber(account.number)})`, value: account.id })))
+		        return await interaction.respond(accounts.map(account => ({ name: `${account.name} - ${account.type} - (${formatAccountNumber(account.number)})`, value: account.number })))
             }
         }
     }

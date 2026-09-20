@@ -1,5 +1,6 @@
 - improve information
 - add standard functions
+- account access perms
 - work through accounts not just direct account balances
 - use the account number not id for commands
 - embeds/formatting improvements

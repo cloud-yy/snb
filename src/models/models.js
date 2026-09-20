@@ -17,28 +17,30 @@ const Account = account(sequelize)
 const AccountAccess = accountAccess(sequelize)
 const AccountBalance = accountBalance(sequelize)
 
-Account.belongsToMany(User, { through: AccountAccess, foreignKey: "accountId" })
-User.belongsToMany(Account, { through: AccountAccess, foreignKey: "userId" })
+Account.belongsToMany(User, { through: AccountAccess, foreignKey: "accountId", onDelete: "CASCADE", onUpdate: "CASCADE" })
+User.belongsToMany(Account, { through: AccountAccess, foreignKey: "userId", onDelete: "CASCADE", onUpdate: "CASCADE" })
 
-Account.hasMany(AccountBalance, { foreignKey: "accountId" })
-AccountBalance.belongsTo(Account, { foreignKey: "accountId" })
+Account.hasMany(AccountBalance, { foreignKey: "accountId", onDelete: "RESTRICT", onUpdate: "CASCADE" })
+AccountBalance.belongsTo(Account, { foreignKey: "accountId", onDelete: "RESTRICT", onUpdate: "CASCADE" })
 
 // Logging
 
 const AuditLog = auditLog(sequelize)
 const Ledger = ledger(sequelize)
 
-AuditLog.belongsTo(Account, { foreignKey: "accountId" })
-AuditLog.belongsTo(User, { foreignKey: "userId" })
+AuditLog.belongsTo(Account, { foreignKey: "accountId", onDelete: "RESTRICT", onUpdate: "CASCADE" })
+AuditLog.belongsTo(User, { foreignKey: "userId", onDelete: "SET NULL", onUpdate: "CASCADE" })
+AuditLog.belongsTo(Ledger, { foreignKey: "ledgerId", onDelete: "RESTRICT", onUpdate: "CASCADE" })
 
-Account.hasMany(AuditLog, { foreignKey: "accountId" })
-User.hasMany(AuditLog, { foreignKey: "userId" })
+Account.hasMany(AuditLog, { foreignKey: "accountId", onDelete: "RESTRICT", onUpdate: "CASCADE" })
+User.hasMany(AuditLog, { foreignKey: "userId", onDelete: "SET NULL", onUpdate: "CASCADE" })
 
-Ledger.belongsTo(Account, { foreignKey: "payorId" })
-Ledger.belongsTo(Account, { foreignKey: "payeeId" })
+Ledger.belongsTo(Account, { foreignKey: "payorId", onDelete: "RESTRICT", onUpdate: "CASCADE" })
+Ledger.belongsTo(Account, { foreignKey: "payeeId", onDelete: "RESTRICT", onUpdate: "CASCADE" })
+Ledger.hasMany(AuditLog, { foreignKey: "ledgerId", onDelete: "RESTRICT", onUpdate: "CASCADE" })
 
-Account.hasMany(Ledger, { foreignKey: "payorId"})
-Account.hasMany(Ledger, { foreignKey: "payeeId"})
+Account.hasMany(Ledger, { foreignKey: "payorId", onDelete: "RESTRICT", onUpdate: "CASCADE" })
+Account.hasMany(Ledger, { foreignKey: "payeeId", onDelete: "RESTRICT", onUpdate: "CASCADE" })
 
 // Services
 

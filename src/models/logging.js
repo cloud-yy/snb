@@ -11,7 +11,7 @@ export const auditLog = (sequelize) => {
             },
 
             action: {
-                type: DataTypes.JSONB,
+                type: DataTypes.STRING,
                 allowNull: false
             },
 
@@ -29,8 +29,11 @@ export const auditLog = (sequelize) => {
             },
 
             userId: {
+                type: DataTypes.BIGINT
+            },
+
+            ledgerId: {
                 type: DataTypes.BIGINT,
-                allowNull: false
             },
         }, {
             indexes: [

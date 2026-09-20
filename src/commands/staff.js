@@ -168,11 +168,7 @@ export default {
                         }
 
                         await AuditLog.create({
-                            action: {
-                                type: "DEPOSIT",
-                                amount,
-                                currency
-                            },
+                            action: "DEPOSIT",
                             before: { balance: oldReserveBalance, currency: currency },
                             after:  { balance: reserveBalance.balance, currency: currency },
                             accountId: reserve,
