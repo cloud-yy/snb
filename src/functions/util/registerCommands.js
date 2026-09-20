@@ -49,7 +49,10 @@ const rest = new REST().setToken(process.env.DISCORD_BOT_TOKEN);
             console.log("No global commands found to register.")
         }
 
+        process.exit(0)
     } catch (error) {
         console.error("Error deploying commands:", error)
+
+        process.exit(1)
     }
 })()

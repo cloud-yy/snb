@@ -27,7 +27,9 @@ client.cooldowns = new Collection()
 client.setMaxListeners(0)
 client.options.presence = { activities: [{ name: "Operational" }], status: PresenceUpdateStatus.Online }
 
-Promise.all([loadRoutes(web), loadEvents(client), loadCommands(client), loadInteractions(client)]).then(() => {
+let ready = false
+
+Promise.all([loadRoutes(web), loadEvents(client, ready), loadCommands(client), loadInteractions(client)]).then(() => {
 	console.log("Database connecting.")
 	sequelize.authenticate().then(() => {
 		console.log("Database connected.")
@@ -42,6 +44,8 @@ Promise.all([loadRoutes(web), loadEvents(client), loadCommands(client), loadInte
 				console.log("Webserver starting.")
 				web.listen(80)
 				console.log("Webserver started.")
+				ready = true
+				console.log("Ready!")
 			})
 		})
 	})

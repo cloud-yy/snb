@@ -62,7 +62,7 @@ export const ledger = (sequelize) => {
             },
 
             amount: {
-                type: DataTypes.BIGINT,
+                type: DataTypes.DECIMAL(10, 2),
                 allowNull: false
             },
 

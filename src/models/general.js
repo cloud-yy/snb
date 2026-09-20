@@ -88,7 +88,7 @@ export const accountBalance = (sequelize) => {
             },
 
             balance: {
-                type: DataTypes.BIGINT,
+                type: DataTypes.DECIMAL(10, 2),
                 allowNull: false,
                 defaultValue: 0
             },

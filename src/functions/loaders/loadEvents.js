@@ -8,7 +8,7 @@ const files = fs
     .readdirSync(eventsPath, {recursive: true})
     .filter((file) => file.endsWith(".js"))
 
-export default async function (client) {
+export default async function (client, ready) {
     for (const file of files) {
         const fullPath = path.join(eventsPath, file)
 
@@ -17,7 +17,11 @@ export default async function (client) {
             const event = eventModule.default
 
             if (event.cron) {
-                cron.schedule(event.cron, () => event.execute())
+                cron.schedule(event.cron, () => {
+                    if (ready) {
+                        event.execute()
+                    }
+                })
             } else {
                 if (event.once) {
                     client.once(event.event, (...args) => event.execute(...args))

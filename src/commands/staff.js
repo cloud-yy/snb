@@ -1,4 +1,4 @@
-import { ChannelType, MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from "discord.js"
+import { MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from "discord.js"
 import { Account, AccountBalance, AuditLog, Ledger, sequelize, User } from "#models/models"
 import companyInfo from "#functions/templates/companyInfo"
 import config from "#config" with { type: 'json' }
@@ -6,7 +6,7 @@ import { Op } from "sequelize"
 import formatAccountNumber from "#functions/util/formatAccountNumber"
 import { createAccount } from "#functions/db/account"
 import { userFromDiscord } from "#functions/db/user"
-import { accountBalance } from "#models/general"
+import formatCurrency from "#functions/util/formatCurrency"
 
 export default {
     command: 
@@ -33,7 +33,7 @@ export default {
                             .setRequired(true)
                             .setAutocomplete(true)
                     )
-                    .addIntegerOption((option) =>
+                    .addNumberOption((option) =>
                         option
                             .setName("amount")
                             .setDescription("The amount deposited")
@@ -110,8 +110,10 @@ export default {
             case "deposit": {
                 const reserve = interaction.options.getString("reserve")
                 const account = interaction.options.getString("account")
-                const amount = interaction.options.getInteger("amount")
+                const rawAmount = interaction.options.getNumber("amount")
                 const currency = interaction.options.getString("currency")
+
+                const amount = Math.round(rawAmount * 100) / 100;
 
                 try {
                     const [oldReserveBalance, newReserveBalance, oldAccountBalance, newAccountBalance] = await sequelize.transaction(async transaction => {
@@ -154,7 +156,7 @@ export default {
                             currency,
                             status: "SUCCESS",
                             type: "DEPOSIT",
-                            reference: "ACCOUNT DEPOSIT"
+                            reference: "Account Deposit"
                         }, { transaction })
 
                         const user = await User.findOne({
@@ -164,9 +166,6 @@ export default {
                         if (!user) {
                             throw new Error("User not found.")
                         }
-
-                        await reserveBalance.reload({ transaction })
-                        await accountBalance.reload({ transaction })
 
                         await AuditLog.create({
                             action: {
@@ -183,7 +182,7 @@ export default {
                         return [oldReserveBalance, reserveBalance.balance, oldAccountBalance, accountBalance.balance]
                     })
 
-                    return interaction.reply({ content: `Success!\n${currency}${amount} has been deposited!\nReserve: ${currency}${oldReserveBalance} >>> ${currency}${newReserveBalance}\nAccount: ${currency}${oldAccountBalance} >>> ${currency}${newAccountBalance}`, flags: MessageFlags.Ephemeral })
+                    return interaction.reply({ content: `Success!\n${currency} ${formatCurrency(amount)} has been deposited!\nReserve: ${currency} ${formatCurrency(oldReserveBalance)} >>> ${currency} ${formatCurrency(newReserveBalance)}\nAccount: ${currency} ${formatCurrency(oldAccountBalance)} >>> ${currency} ${formatCurrency(newAccountBalance)}`, flags: MessageFlags.Ephemeral })
                 } catch (error) {
                     console.error("Failed to deposit!", error)
                     return interaction.reply({ content: "There was an error running this database transaction.", flags: MessageFlags.Ephemeral })
@@ -221,7 +220,7 @@ export default {
                 const reserveOnly = focused.name === "reserve"
 
                 const accounts = await Account.findAll({
-                    where: {[Op.and]: [
+                    where: [
                         {[Op.or]: [
                             { number: { [Op.like]: `%${focused.value}%` } },
                             { name: { [Op.like]: `%${focused.value}%` } }
@@ -230,7 +229,7 @@ export default {
                         reserveOnly
                             ? { type: "Reserve" }
                             : { type: { [Op.ne]: "Reserve" } }
-                    ]},
+                    ],
 
                     limit: 25
                 })
