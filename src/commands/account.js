@@ -1,5 +1,5 @@
 import { MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from "discord.js"
-import { Account, AccountBalance,  } from "#models/models"
+import { Account, AccountAccess, AccountBalance, User,  } from "#models/models"
 import config from "#config" with { type: 'json' }
 import { Op } from "sequelize"
 import formatAccountNumber from "#functions/util/formatAccountNumber"
@@ -95,7 +95,7 @@ export default {
                     ],
                 })
 
-                const balanceText = balances.map(balance => `${balance.currency}${formatCurrency(balance.balance)}`).join("\n")
+                const balanceText = balances.map(balance => `${balance.currency} ${formatCurrency(balance.balance)}`).join("\n")
 
                 return interaction.reply({ content: balanceText, flags: show ? undefined : MessageFlags.Ephemeral }) 
             }
@@ -106,27 +106,40 @@ export default {
         const focused = interaction.options.getFocused(true)
 
 		switch(focused.name) {
-            case "from":
             case "to":
-            case "account": {
-                const reserveOnly = focused.name === "reserve"
-
                 const accounts = await Account.findAll({
                     where: {[Op.and]: [
                         {[Op.or]: [
                             { number: { [Op.like]: `%${focused.value}%` } },
                             { name: { [Op.like]: `%${focused.value}%` } }
                         ]},
-                        
-                        reserveOnly
-                            ? { type: "Reserve" }
-                            : { type: { [Op.ne]: "Reserve" } }
                     ]},
 
                     limit: 25
                 })
 
-		        await interaction.respond(accounts.map(account => ({ name: `${account.name} - ${account.type} - (${formatAccountNumber(account.number)})`, value: account.id })))
+		        return await interaction.respond(accounts.map(account => ({ name: `${account.name} - ${account.type} - (${formatAccountNumber(account.number)})`, value: account.id })))
+            case "from":
+            case "account": {
+                const accounts = await Account.findAll({
+                    where: {[Op.and]: [
+                        {[Op.or]: [
+                            { number: { [Op.like]: `%${focused.value}%` } },
+                            { name: { [Op.like]: `%${focused.value}%` } }
+                        ]},
+                    ]},
+
+                    include: [{
+                        model: User,
+                        as: "users",
+                        required: true,
+                        where: { discordId: interaction.user.id }
+                    }],
+
+                    limit: 25
+                })
+
+		        return await interaction.respond(accounts.map(account => ({ name: `${account.name} - ${account.type} - (${formatAccountNumber(account.number)})`, value: account.id })))
             }
         }
     }

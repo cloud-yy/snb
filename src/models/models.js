@@ -17,28 +17,28 @@ const Account = account(sequelize)
 const AccountAccess = accountAccess(sequelize)
 const AccountBalance = accountBalance(sequelize)
 
-Account.belongsToMany(User, { through: AccountAccess, foreignKey: "accountId", as: "users" })
-User.belongsToMany(Account, { through: AccountAccess, foreignKey: "userId", as: "accounts" })
+Account.belongsToMany(User, { through: AccountAccess, foreignKey: "accountId" })
+User.belongsToMany(Account, { through: AccountAccess, foreignKey: "userId" })
 
-Account.hasMany(AccountBalance, { foreignKey: "accountId", as: "balances" })
-AccountBalance.belongsTo(Account, { foreignKey: "accountId", as: "account" })
+Account.hasMany(AccountBalance, { foreignKey: "accountId" })
+AccountBalance.belongsTo(Account, { foreignKey: "accountId" })
 
 // Logging
 
 const AuditLog = auditLog(sequelize)
 const Ledger = ledger(sequelize)
 
-AuditLog.belongsTo(Account, { foreignKey: "accountId", as: "account" })
-AuditLog.belongsTo(User, { foreignKey: "userId", as: "user" })
+AuditLog.belongsTo(Account, { foreignKey: "accountId" })
+AuditLog.belongsTo(User, { foreignKey: "userId" })
 
-Account.hasMany(AuditLog, { foreignKey: "accountId", as: "auditLogs" })
-User.hasMany(AuditLog, { foreignKey: "userId", as: "auditLogs" })
+Account.hasMany(AuditLog, { foreignKey: "accountId" })
+User.hasMany(AuditLog, { foreignKey: "userId" })
 
-Ledger.belongsTo(Account, { foreignKey: "payorId", as: "payor" })
-Ledger.belongsTo(Account, { foreignKey: "payeeId", as: "payee" })
+Ledger.belongsTo(Account, { foreignKey: "payorId" })
+Ledger.belongsTo(Account, { foreignKey: "payeeId" })
 
-Account.hasMany(Ledger, { foreignKey: "payorId", as: "ledgersPayor"})
-Account.hasMany(Ledger, { foreignKey: "payeeId", as: "ledgersPayee"})
+Account.hasMany(Ledger, { foreignKey: "payorId"})
+Account.hasMany(Ledger, { foreignKey: "payeeId"})
 
 // Services
 
