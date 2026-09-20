@@ -113,7 +113,7 @@ export default {
                 const rawAmount = interaction.options.getNumber("amount")
                 const currency = interaction.options.getString("currency")
 
-                const amount = Math.round(rawAmount * 100) / 100;
+                const amount = Math.round(rawAmount * 100) / 100
 
                 try {
                     const [oldReserveBalance, newReserveBalance, oldAccountBalance, newAccountBalance] = await sequelize.transaction(async transaction => {
@@ -182,7 +182,7 @@ export default {
                         return [oldReserveBalance, reserveBalance.balance, oldAccountBalance, accountBalance.balance]
                     })
 
-                    return interaction.reply({ content: `Success!\n${currency} ${formatCurrency(amount)} has been deposited!\nReserve: ${currency} ${formatCurrency(oldReserveBalance)} >>> ${currency} ${formatCurrency(newReserveBalance)}\nAccount: ${currency} ${formatCurrency(oldAccountBalance)} >>> ${currency} ${formatCurrency(newAccountBalance)}`, flags: MessageFlags.Ephemeral })
+                    return interaction.reply({ content: `Success!\n${currency} ${formatCurrency(amount)} has been deposited!\nReserve: ${currency} ${formatCurrency(oldReserveBalance)} > ${currency} ${formatCurrency(newReserveBalance)}\nAccount: ${currency} ${formatCurrency(oldAccountBalance)} > ${currency} ${formatCurrency(newAccountBalance)}`, flags: MessageFlags.Ephemeral })
                 } catch (error) {
                     console.error("Failed to deposit!", error)
                     return interaction.reply({ content: "There was an error running this database transaction.", flags: MessageFlags.Ephemeral })
