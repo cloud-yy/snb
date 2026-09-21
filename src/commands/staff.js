@@ -1,10 +1,10 @@
 import { MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from "discord.js"
-import { Account, AccountBalance, AuditLog, Ledger, sequelize, User } from "#models/models"
-import companyInfo from "#functions/templates/companyInfo"
+import { Account } from "#models/models"
+import register from "#functions/templates/register"
 import config from "#config" with { type: 'json' }
 import { Op } from "sequelize"
 import formatAccountNumber from "#functions/util/formatAccountNumber"
-import { createAccount } from "#functions/db/account"
+import { accountFromNumber, createAccount, transfer } from "#functions/db/account"
 import { userFromDiscord } from "#functions/db/user"
 import formatCurrency from "#functions/util/formatCurrency"
 
@@ -84,10 +84,7 @@ export default {
                             .setDescription("The name of the embed you want to send")
                             .setRequired(true)
                             .addChoices(
-                                { name: "Company Info", value: "companyInfo" },
-                                { name: "Register Prompt", value: "register" },
-                                { name: "Open Account", value: "openAccount" },
-                                { name: "Account Options", value: "accountOptions" }
+                                { name: "Register Prompt", value: "register" }
                             )
                     )
             ),
@@ -96,13 +93,17 @@ export default {
     scope: "local",
 
     execute: async (interaction) => {
+        if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
+            return interaction.reply({ content: "You do not have permission to use this command.", flags: MessageFlags.Ephemeral })
+        }
+
         const command = interaction.options.getSubcommand()
 
         switch(command) {
             case "embed": {
                 const channel = interaction.options.getChannel("channel") || interaction.channel
 
-                await channel.send(companyInfo)
+                await channel.send(register)
 
                 return interaction.reply({ content: `Message successfully sent in <#${channel.id}>`, flags: MessageFlags.Ephemeral })
             }
@@ -113,76 +114,34 @@ export default {
                 const rawAmount = interaction.options.getNumber("amount")
                 const currency = interaction.options.getString("currency")
 
-                const amount = Math.round(rawAmount * 100) / 100
+                const reserveAccount = await accountFromNumber(reserve)
+
+                if (!reserveAccount || reserveAccount.type !== "Reserve") {
+                    return interaction.reply({ content: "Valid reserve account not found!", flags: MessageFlags.Ephemeral })
+                }
+
+                const receivingAccount = await accountFromNumber(account)
+
+                if (!receivingAccount || receivingAccount.type === "Reserve") {
+                    return interaction.reply({ content: "Valid receiving account not found!", flags: MessageFlags.Ephemeral })
+                }
+
+                const user = await userFromDiscord(interaction.user.id)
+
+                if (!user) {
+                    return interaction.reply({ content: "Your user profile has not been found!", flags: MessageFlags.Ephemeral })
+                }
+
+                let ledger
 
                 try {
-                    const [oldReserveBalance, newReserveBalance, oldAccountBalance, newAccountBalance] = await sequelize.transaction(async transaction => {
-                        const [reserveBalance, reserveCreated] = await AccountBalance.findOrCreate({
-                            where: { accountId: reserve },
-                            defaults: {
-                                balance: 0,
-                                currency
-                            },
-                            transaction
-                        })
-
-                        const oldReserveBalance = reserveBalance.balance
-
-                        await reserveBalance.increment("balance", {
-                            by: -amount,
-                            transaction
-                        })
-
-                        const [accountBalance, accountCreated] = await AccountBalance.findOrCreate({
-                            where: { accountId: account },
-                            defaults: {
-                                balance: 0,
-                                currency
-                            },
-                            transaction
-                        })
-
-                        const oldAccountBalance = accountBalance.balance
-
-                        await accountBalance.increment("balance", {
-                            by: amount,
-                            transaction
-                        })
-
-                        await Ledger.create({
-                            payorId: reserve,
-                            payeeId: account,
-                            amount,
-                            currency,
-                            status: "SUCCESS",
-                            type: "DEPOSIT",
-                            reference: "Account Deposit"
-                        }, { transaction })
-
-                        const user = await User.findOne({
-                            where: { discordId: interaction.user.id }
-                        }, { transaction })
-
-                        if (!user) {
-                            throw new Error("User not found.")
-                        }
-
-                        await AuditLog.create({
-                            action: "DEPOSIT",
-                            before: { balance: oldReserveBalance, currency: currency },
-                            after:  { balance: reserveBalance.balance, currency: currency },
-                            accountId: reserve,
-                            userId: user.id
-                        }, { transaction })
-
-                        return [oldReserveBalance, reserveBalance.balance, oldAccountBalance, accountBalance.balance]
-                    })
-
-                    return interaction.reply({ content: `Success!\n${currency} ${formatCurrency(amount)} has been deposited!\nReserve: ${currency} ${formatCurrency(oldReserveBalance)} > ${currency} ${formatCurrency(newReserveBalance)}\nAccount: ${currency} ${formatCurrency(oldAccountBalance)} > ${currency} ${formatCurrency(newAccountBalance)}`, flags: MessageFlags.Ephemeral })
+                    ledger = await transfer(reserveAccount, receivingAccount, rawAmount, currency, "Account Deposit", user, true)
                 } catch (error) {
                     console.error("Failed to deposit!", error)
-                    return interaction.reply({ content: "There was an error running this database transaction.", flags: MessageFlags.Ephemeral })
+                    return interaction.reply({ content: `There was an error during this deposit, no money has been moved. Please contact support if this issue persists.\n${error}`, flags: MessageFlags.Ephemeral })
                 }
+
+                return interaction.reply({ content: `Success!\n${currency} ${formatCurrency(ledger.amount)} has been deposited!\n${formatAccountNumber(reserve)} > ${formatAccountNumber(account)}\nTransaction ID: ${ledger.uuid}`, flags: MessageFlags.Ephemeral })
             }
 
             case "open": {
@@ -208,6 +167,10 @@ export default {
     },
 
     autocomplete: async (interaction) => {
+        if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
+            return interaction.respond([])
+        }
+
         const focused = interaction.options.getFocused(true)
 
 		switch(focused.name) {
@@ -230,7 +193,7 @@ export default {
                     limit: 25
                 })
 
-		        await interaction.respond(accounts.map(account => ({ name: `${account.name} - ${account.type} - (${formatAccountNumber(account.number)})`, value: account.id })))
+		        await interaction.respond(accounts.map(account => ({ name: `${account.name} - ${account.type} - (${formatAccountNumber(account.number)})`, value: account.number })))
             }
         }
     }

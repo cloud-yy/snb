@@ -1,11 +1,15 @@
-import { Account, AccountAccess, AccountBalance, AuditLog, Ledger, sequelize } from "#models/models"
+import { Account, AccountBalance, Ledger, sequelize } from "#models/models"
 import config from "#config" with { type: 'json' }
 import generateAccountNumber from "#functions/util/generateAccountNumber"
 
 export async function createAccount(owner, type = "General", chosenName) {
+    if (!owner) {
+        return
+    }
+
     const accountConfig = config.accounts?.[type]
 
-    if (!config) {
+    if (!accountConfig) {
         return
     }
 
@@ -20,17 +24,13 @@ export async function createAccount(owner, type = "General", chosenName) {
                 number: await generateAccountNumber(4)
             }, {transaction})
 
-            if (owner) {
-                await AccountAccess.create({
-                    accountId: account.id,
-                    userId: owner.id,
-                    access: "Holder"
-                }, {transaction})
-            }
+            await owner.addAccount(account, {
+                through: { access: "Holder" },
+                transaction
+            })
 
-            await AuditLog.create({
+            await owner.createAuditLog({
                 accountId: account.id,
-                userId: owner.id,
                 action: "ACCOUNT_CREATED",
                 before: null,
                 after: account.toJSON()
@@ -62,7 +62,7 @@ export async function transfer(from, to, rawAmount, currency, reference, user, o
 
     const amount = Math.round(rawAmount * 100) / 100
 
-    if (amount === 0 || !Number.isFinite(amount)) {
+    if (amount <= 0 || !Number.isFinite(amount)) {
         throw new Error("INVALID_AMOUNT")
     }
 
@@ -137,12 +137,11 @@ export async function transfer(from, to, rawAmount, currency, reference, user, o
         if (user) {
             await fromBalance.reload({ transaction })
 
-            await AuditLog.create({
+            await user.createAuditLog({
                 action: "TRANSFER",
                 before: { balance: oldFromBalance },
                 after:  { balance: fromBalance.balance },
                 accountId: from.id,
-                userId: user.id,
                 ledgerId: ledger.id
             }, { transaction })
         }

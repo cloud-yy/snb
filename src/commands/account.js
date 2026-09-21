@@ -1,5 +1,5 @@
-import { MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from "discord.js"
-import { Account, AccountAccess, AccountBalance, AuditLog, Ledger, sequelize, User,  } from "#models/models"
+import { MessageFlags, SlashCommandBuilder } from "discord.js"
+import { Account, User } from "#models/models"
 import config from "#config" with { type: 'json' }
 import { Op } from "sequelize"
 import formatAccountNumber from "#functions/util/formatAccountNumber"
@@ -94,13 +94,20 @@ export default {
                 const show = interaction.options.getBoolean("show")
                 const currency = interaction.options.getString("currency")
 
-                const balances = await AccountBalance.findAll({
-                    where: [
-                        { accountId: account },
-                        currency
-                            ? { currency }
-                            : [] 
-                    ],
+                const user = await userFromDiscord(interaction.user.id)
+
+                if (!user) {
+                    return interaction.reply({ content: "Your user profile has not been found!", flags: MessageFlags.Ephemeral })
+                }
+
+                const selectedAccount = await accountFromNumber(account)
+
+                if (!selectedAccount || !await selectedAccount.hasUser(user)) {
+                    return interaction.reply({ content: "Account not found or you do not have access to it!", flags: MessageFlags.Ephemeral })
+                }
+
+                const balances = await selectedAccount.getAccountBalances({
+                    where: currency ? { currency } : undefined
                 })
 
 
@@ -121,10 +128,16 @@ export default {
                 const reference = interaction.options.getString("reference") || "Transfer"
                 const show = interaction.options.getBoolean("show")
 
+                const user = await userFromDiscord(interaction.user.id)
+
+                if (!user) {
+                    return interaction.reply({ content: "Your user profile has not been found!", flags: MessageFlags.Ephemeral })
+                }
+
                 const fromAccount = await accountFromNumber(from)
 
-                if (!fromAccount) {
-                    return interaction.reply({ content: "Sending account not found!", flags: MessageFlags.Ephemeral })
+                if (!fromAccount || !await fromAccount.hasUser(user)) {
+                    return interaction.reply({ content: "Sending account not found or you do not have access to it!", flags: MessageFlags.Ephemeral })
                 }
 
                 const toAccount = await accountFromNumber(to)
@@ -133,19 +146,15 @@ export default {
                     return interaction.reply({ content: "Receiving account not found!", flags: MessageFlags.Ephemeral })
                 }
 
-                const user = userFromDiscord(interaction.user.id)
-
-                if (!user) {
-                    return interaction.reply({ content: "Your user profile has not been found!", flags: MessageFlags.Ephemeral })
-                }
+                let ledger
 
                 try {
-                    const ledger = await transfer(fromAccount, toAccount, rawAmount, currency, reference, user, false)
-
-                    return interaction.reply({ content: `Success!\n${currency} ${formatCurrency(amount)} has been been transfered!\n${formatAccountNumber(from)} > ${formatAccountNumber(to)}`,flags: show ? undefined : MessageFlags.Ephemeral })
+                    ledger = await transfer(fromAccount, toAccount, rawAmount, currency, reference, user, false)
                 } catch (error) {
                     return interaction.reply({ content: `There was an error during this transfer, no money has been moved. Please contact support if this issue persists.\n${error}`, flags: MessageFlags.Ephemeral })
                 }
+
+                return interaction.reply({ content: `Success!\n${currency} ${formatCurrency(ledger.amount)} has been transferred!\n${formatAccountNumber(from)} > ${formatAccountNumber(to)}\nTransaction ID: ${ledger.uuid}`, flags: show ? undefined : MessageFlags.Ephemeral })
             }
         }
     },

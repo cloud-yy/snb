@@ -1,4 +1,5 @@
 import { client } from "#index"
+import config from "#config" with { type: 'json' }
 
 let Guild
 let Roles
@@ -32,6 +33,18 @@ export async function updateRoles(user) {
         return console.log("Member not found.")
     }
     
-    giveRoleByName(member, "✔️")
-    giveRoleByName(member, user.role)
+    await giveRoleByName(member, "✔️")
+    await giveRoleByName(member, user.role)
+
+    const accounts = await user.getAccounts({ attributes: ["type"] })
+    
+    const accountRoles = new Set(
+        accounts
+            .map(account => config.accounts?.[account.type]?.role)
+            .filter(role => typeof role === "string" && role.trim().length > 0)
+    )
+
+    for (const roleName of accountRoles) {
+        await giveRoleByName(member, roleName)
+    }
 }

@@ -1,4 +1,4 @@
-import { DataTypes } from "sequelize"
+import { DataTypes, literal } from "sequelize"
 
 export const auditLog = (sequelize) => {
     return sequelize.define(
@@ -52,6 +52,13 @@ export const ledger = (sequelize) => {
                 type: DataTypes.BIGINT,
                 primaryKey: true,
                 autoIncrement: true
+            },
+
+            uuid: {
+                type: DataTypes.UUID,
+                defaultValue: literal("gen_random_uuid()"),
+                allowNull: false,
+                unique: true
             },
 
             payorId: {

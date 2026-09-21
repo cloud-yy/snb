@@ -5,7 +5,18 @@
         },
 
         "Business": {
-            "type": "business"
+            "type": "business",
+            "role": "Business Account Holder"
+        },
+
+        "Exclusive": {
+            "type": "personal",
+            "role": "Exclusive Account Holder"
+        },
+
+        "Executive": {
+            "type": "personal",
+            "role": "Executive Account Holder"
         },
 
         "Reserve": {
