@@ -1,14 +1,11 @@
 - improve information
 - add standard functions
 - account access perms
-- work through accounts not just direct account balances
-- use the account number not id for commands
 - embeds/formatting improvements
 - branding for above
 - user commands to view accounts
 - discord gui for account management
-- implement card userId
-- add additional account types
+- implement card userId (?)
 - standing orders
 - direct debit
 - business commands and tools
