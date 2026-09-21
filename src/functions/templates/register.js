@@ -21,7 +21,7 @@ export default {
         inline: false
       },
     )
-    .setImage("https://media.discordapp.net/attachments/1491214857058385942/1533218894649622538/snbBaner.png?ex=6a6fb0de&is=6a6e5f5e&hm=aac0846f131c304fd6ce8c27767cea98aa85d4e5a6568d8f982ce1cb26948ed5&=&format=webp&quality=lossless")
+    .setImage("https://cdn.discordapp.com/emojis/1531035917123322009.webp")
     .setColor("#1c126e")
   ],
 
