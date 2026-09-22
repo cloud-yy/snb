@@ -24,5 +24,12 @@
         }
     },
 
+    "accountAccesses": {
+        "Viewer": 5,
+        "Signatory": 10,
+        "Manager": 15,
+        "Holder": 20
+    },
+
     "currencies": ["HC$", "RW$", "CC$"]
 }

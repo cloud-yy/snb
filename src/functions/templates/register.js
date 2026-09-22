@@ -1,9 +1,9 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, resolvePartialEmoji } from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js"
+import { bannerImage, embed, snbEmoji } from "#functions/templates/templates"
 
 export default {
   embeds: [
-    new EmbedBuilder()
-    .setTitle("State National Bank")
+    embed("State National Bank")
     .addFields(
       {
         name: "Our Business is Your Business",
@@ -21,11 +21,10 @@ export default {
         inline: false
       },
     )
-    .setImage("https://media.discordapp.net/attachments/1491214857058385942/1533218894649622538/snbBaner.png?ex=6ab2ed5e&is=6ab19bde&hm=97779001539b4653b269bacb439b85b7794c3f5f1cfea4a79149712315c68cf6&=&format=webp&quality=lossless")
-    .setColor("#1c126e")
+    .setImage(bannerImage)
   ],
 
   components: [
-    new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId("login").setLabel("Connect Your Account").setStyle(ButtonStyle.Secondary).setEmoji(resolvePartialEmoji("<:SNB:1531035917123322009>")))
+    new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId("login").setLabel("Connect Your Account").setStyle(ButtonStyle.Secondary).setEmoji(snbEmoji))
   ]
 }

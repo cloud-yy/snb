@@ -6,7 +6,10 @@ export default {
     cron: "*/1 * * * *",
 
     async execute() {
-        const users = await User.findAll({ where: { discordId: { [Op.not]: null }, robloxId: { [Op.not]: null }, role: { [Op.not]: null } } })
+        const users = await User.findAll({
+            attributes: ["id", "discordId", "role"],
+            where: { discordId: { [Op.not]: null }, robloxId: { [Op.not]: null }, role: { [Op.not]: null } }
+        })
 
         if (!users.length) {
             return

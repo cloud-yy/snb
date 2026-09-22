@@ -42,7 +42,7 @@ Promise.all([loadRoutes(web), loadEvents(client, ready), loadCommands(client), l
 				console.log("Logged in.")
 
 				console.log("Webserver starting.")
-				web.listen(80)
+				web.listen(8081)
 				console.log("Webserver started.")
 				ready = true
 				console.log("Ready!")

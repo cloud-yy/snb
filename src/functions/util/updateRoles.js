@@ -1,5 +1,6 @@
 import { client } from "#index"
 import config from "#config" with { type: 'json' }
+import { Op } from "sequelize"
 
 let Guild
 let Roles
@@ -36,7 +37,13 @@ export async function updateRoles(user) {
     await giveRoleByName(member, "✔️")
     await giveRoleByName(member, user.role)
 
-    const accounts = await user.getAccounts({ attributes: ["type"] })
+    const accounts = await user.getAccounts({
+        attributes: ["type"],
+        through: {
+            where: { access: { [Op.gte]: config.accountAccesses.Holder } },
+            attributes: []
+        }
+    })
     
     const accountRoles = new Set(
         accounts

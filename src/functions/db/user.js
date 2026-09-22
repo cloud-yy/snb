@@ -5,6 +5,7 @@ import { Op } from "sequelize"
 
 export async function userFromDiscord (discordId, robloxData) {
     let user = await User.findOne({
+        attributes: ["id", "discordId", "robloxId", "robloxName", "roverTimestamp", "role"],
         where: {
             discordId: discordId 
         }
@@ -54,6 +55,7 @@ export async function userFromDiscord (discordId, robloxData) {
 
 export async function userFromDiscordExternal (discordId) {
     let user = await User.findOne({
+        attributes: ["id", "discordId", "robloxId", "robloxName", "role", "status"],
         where: {
             discordId: discordId,
             robloxId: { [Op.not]: null }

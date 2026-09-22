@@ -60,7 +60,7 @@ export const accountAccess = (sequelize) => {
             },
 
             access: {
-                type: DataTypes.TEXT,
+                type: DataTypes.INTEGER,
                 allowNull: false
             }
         }, {

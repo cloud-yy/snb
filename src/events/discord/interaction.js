@@ -1,4 +1,4 @@
-import { Collection, MessageFlags, Events, time } from "discord.js"
+import { DiscordjsErrorCodes, MessageFlags, Events, RESTJSONErrorCodes } from "discord.js"
 
 export default {
     event: Events.InteractionCreate,
@@ -16,12 +16,19 @@ export default {
         } catch (error) {
             console.error(`Error executing ${interaction.customId}:`, error)
 
-            const errorMessage = { content: "There was an error executing this interaction!", flags: MessageFlags.Ephemeral };
+            if (
+                error.code === RESTJSONErrorCodes.InteractionHasAlreadyBeenAcknowledged ||
+                error.code === DiscordjsErrorCodes.InteractionAlreadyReplied
+            ) {
+                return
+            }
+
+            const errorMessage = { content: "There was an error executing this interaction!", flags: MessageFlags.Ephemeral }
         
             if (interaction.replied || interaction.deferred) {
-                await interaction.followUp(errorMessage);
+                await interaction.followUp(errorMessage)
             } else {
-                await interaction.reply(errorMessage);
+                await interaction.reply(errorMessage)
             }
         }
     }

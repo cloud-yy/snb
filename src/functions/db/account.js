@@ -1,5 +1,6 @@
-import { Account, AccountBalance, Ledger, sequelize } from "#models/models"
+import { Account, AccountAccess, AccountBalance, Ledger, sequelize } from "#models/models"
 import config from "#config" with { type: 'json' }
+import { Op } from "sequelize"
 import generateAccountNumber from "#functions/util/generateAccountNumber"
 
 export async function createAccount(owner, type = "General", chosenName) {
@@ -25,7 +26,7 @@ export async function createAccount(owner, type = "General", chosenName) {
             }, {transaction})
 
             await owner.addAccount(account, {
-                through: { access: "Holder" },
+                through: { access: config.accountAccesses.Holder },
                 transaction
             })
 
@@ -45,6 +46,80 @@ export async function createAccount(owner, type = "General", chosenName) {
 
         return null
     }
+}
+
+export async function hasAccountAccess(user, account, requiredAccess = config.accountAccesses.Viewer) {
+    if (!user || !account || !Number.isInteger(requiredAccess)) {
+        return false
+    }
+
+    const access = await AccountAccess.findOne({
+        where: {
+            userId: user.id,
+            accountId: account.id,
+            access: { [Op.gte]: requiredAccess }
+        },
+        attributes: ["id"]
+    })
+
+    return Boolean(access)
+}
+
+export async function getAccountAccess(user, account) {
+    if (!user || !account) {
+        return null
+    }
+
+    const accountAccess = await AccountAccess.findOne({
+        where: {
+            userId: user.id,
+            accountId: account.id
+        },
+        attributes: ["access"]
+    })
+
+    return accountAccess?.access ?? null
+}
+
+export async function setAccountAccess(actor, user, account, access) {
+    if (!actor || !user || !account || !Object.values(config.accountAccesses).includes(access)) {
+        throw new Error("INVALID_ACCOUNT_ACCESS")
+    }
+
+    return await sequelize.transaction(async transaction => {
+        const existingAccess = await AccountAccess.findOne({
+            attributes: ["id", "access"],
+            where: {
+                userId: user.id,
+                accountId: account.id
+            },
+            transaction,
+            lock: transaction.LOCK.UPDATE
+        })
+
+        const before = existingAccess
+            ? { userId: user.id, access: existingAccess.access }
+            : null
+
+        if (existingAccess) {
+            await existingAccess.update({ access }, { transaction })
+        } else {
+            await AccountAccess.create({
+                userId: user.id,
+                accountId: account.id,
+                access
+            }, { transaction })
+        }
+
+        await actor.createAuditLog({
+            accountId: account.id,
+            action: "ACCOUNT_ACCESS_UPDATED",
+            before,
+            after: { userId: user.id, access }
+        }, { transaction })
+
+        return access
+    })
 }
 
 export async function transfer(from, to, rawAmount, currency, reference, user, overdraft = false) {
@@ -72,6 +147,7 @@ export async function transfer(from, to, rawAmount, currency, reference, user, o
         const secondAccount = fromFirst ? to : from
 
         await AccountBalance.findOrCreate({
+            attributes: ["id"],
             where: {
                 accountId: firstAccount.id,
                 currency
@@ -80,6 +156,7 @@ export async function transfer(from, to, rawAmount, currency, reference, user, o
         })
 
         const firstBalance = await AccountBalance.findOne({
+            attributes: ["id", "balance"],
             where: {
                 accountId: firstAccount.id,
                 currency
@@ -89,6 +166,7 @@ export async function transfer(from, to, rawAmount, currency, reference, user, o
         })
 
         await AccountBalance.findOrCreate({
+            attributes: ["id"],
             where: {
                 accountId: secondAccount.id,
                 currency
@@ -97,6 +175,7 @@ export async function transfer(from, to, rawAmount, currency, reference, user, o
         })
 
         const secondBalance = await AccountBalance.findOne({
+            attributes: ["id", "balance"],
             where: {
                 accountId: secondAccount.id,
                 currency
@@ -151,5 +230,9 @@ export async function transfer(from, to, rawAmount, currency, reference, user, o
 }
 
 export async function accountFromNumber(number, transaction) {
-    return await Account.findOne({where: { number }, ...transaction && { transaction }})
+    return await Account.findOne({
+        attributes: ["id", "name", "number", "status", "type"],
+        where: { number },
+        ...transaction && { transaction }
+    })
 }

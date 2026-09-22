@@ -1,6 +1,7 @@
 import { MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from "discord.js"
 import { Account } from "#models/models"
 import register from "#functions/templates/register"
+import { login as access } from "#functions/templates/access"
 import config from "#config" with { type: 'json' }
 import { Op } from "sequelize"
 import formatAccountNumber from "#functions/util/formatAccountNumber"
@@ -77,14 +78,15 @@ export default {
             .addSubcommand((subcommand) =>
                 subcommand
                     .setName("embed")
-                    .setDescription("Registers a deposit and debits relevant accounts")
+                    .setDescription("Sends a system prompt in the current channel")
                     .addStringOption((option) =>
                         option
                             .setName("embed")
                             .setDescription("The name of the embed you want to send")
                             .setRequired(true)
                             .addChoices(
-                                { name: "Register Prompt", value: "register" }
+                                { name: "Register Prompt", value: "register" },
+                                { name: "Online Banking", value: "access" }
                             )
                     )
             ),
@@ -102,8 +104,10 @@ export default {
         switch(command) {
             case "embed": {
                 const channel = interaction.options.getChannel("channel") || interaction.channel
+                const selectedEmbed = interaction.options.getString("embed")
+                const templates = { access, register }
 
-                await channel.send(register)
+                await channel.send(templates[selectedEmbed])
 
                 return interaction.reply({ content: `Message successfully sent in <#${channel.id}>`, flags: MessageFlags.Ephemeral })
             }
@@ -179,6 +183,7 @@ export default {
                 const reserveOnly = focused.name === "reserve"
 
                 const accounts = await Account.findAll({
+                    attributes: ["name", "number", "type"],
                     where: [
                         {[Op.or]: [
                             { number: { [Op.like]: `%${focused.value}%` } },
