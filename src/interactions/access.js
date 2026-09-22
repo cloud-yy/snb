@@ -251,6 +251,8 @@ async function submitTransfer(interaction, accountNumber) {
 export default {
     id: "access",
 
+    open: async interaction => await showAccountPicker(interaction, true),
+
     execute: async interaction => {
         const [prefix, action, ...parts] = interaction.customId.split("_")
 

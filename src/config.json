@@ -8,6 +8,11 @@
             "type": "business",
             "role": "Business Account Holder"
         },
+        
+        "Enterprize": {
+            "type": "business",
+            "role": "Enterprize Account Holder"
+        },
 
         "Exclusive": {
             "type": "personal",

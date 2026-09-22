@@ -1,4 +1,9 @@
-import { MessageFlags, SlashCommandBuilder } from "discord.js"
+import {
+    ApplicationIntegrationType,
+    InteractionContextType,
+    MessageFlags,
+    SlashCommandBuilder
+} from "discord.js"
 import { Account, User } from "#models/models"
 import config from "#config" with { type: 'json' }
 import { Op } from "sequelize"
@@ -12,6 +17,15 @@ export default {
         new SlashCommandBuilder()
             .setName("account")
             .setDescription("Commands for managing accounts")
+            .setIntegrationTypes(
+                ApplicationIntegrationType.GuildInstall,
+                ApplicationIntegrationType.UserInstall
+            )
+            .setContexts(
+                InteractionContextType.Guild,
+                InteractionContextType.BotDM,
+                InteractionContextType.PrivateChannel
+            )
 
             .addSubcommand((subcommand) =>
                 subcommand
