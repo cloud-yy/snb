@@ -84,5 +84,6 @@
     "currencies": ["HC$", "RW$", "CC$"],
     "timezone": "Europe/London",
     "auditChannelId": "1553367619162210414",
+    "requestChannelId": "1553356007961268324",
     "withdrawalChannelId": "1553356007961268324"
 }

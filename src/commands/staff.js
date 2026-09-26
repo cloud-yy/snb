@@ -28,6 +28,19 @@ function depositErrorMessage(error) {
     }
 }
 
+function withdrawalErrorMessage(error) {
+    switch (error?.message) {
+        case "SAME_ACCOUNT":
+            return message("Withdrawal not completed", "The customer and reserve accounts must be different.", "SAME_ACCOUNT")
+        case "INVALID_AMOUNT":
+            return message("Withdrawal not completed", "Enter an amount greater than zero, using no more than two decimal places.", "INVALID_AMOUNT")
+        case "INSUFFICIENT_FUNDS":
+            return message("Withdrawal not completed", "The customer account does not have enough funds in that currency.", "INSUFFICIENT_FUNDS")
+        default:
+            return message("Withdrawal not completed", "The withdrawal could not be completed and no money was moved. Please try again.", "WITHDRAWAL_FAILED")
+    }
+}
+
 export default {
     command: 
         new SlashCommandBuilder()
@@ -37,7 +50,7 @@ export default {
             .addSubcommand((subcommand) =>
                 subcommand
                     .setName("deposit")
-                    .setDescription("Sends the selected embed in the selected channel")
+                    .setDescription("Moves money from a reserve account into a customer account")
                     .addStringOption((option) =>
                         option
                             .setName("reserve")
@@ -90,6 +103,39 @@ export default {
                         option
                             .setName("name")
                             .setDescription("The optional account name")
+                    )
+            )
+
+            .addSubcommand((subcommand) =>
+                subcommand
+                    .setName("withdraw")
+                    .setDescription("Moves money from a customer account into a reserve account")
+                    .addStringOption((option) =>
+                        option
+                            .setName("reserve")
+                            .setDescription("The reserve account receiving the withdrawn money")
+                            .setRequired(true)
+                            .setAutocomplete(true)
+                    )
+                    .addStringOption((option) =>
+                        option
+                            .setName("account")
+                            .setDescription("The customer account being withdrawn from")
+                            .setRequired(true)
+                            .setAutocomplete(true)
+                    )
+                    .addNumberOption((option) =>
+                        option
+                            .setName("amount")
+                            .setDescription("The amount withdrawn")
+                            .setRequired(true)
+                    )
+                    .addStringOption((option) =>
+                        option
+                            .setName("currency")
+                            .setDescription("The currency of the withdrawal")
+                            .setRequired(true)
+                            .addChoices(config.currencies.map(currency => ({ name: currency, value: currency })))
                     )
             )
 
@@ -412,7 +458,9 @@ export default {
                     ledger = await transfer(reserveAccount, receivingAccount, rawAmount, currency, "Account Deposit", user, {
                         overdraft: true,
                         bypassStatus: true,
-                        notifyAudit: true
+                        notifyAudit: true,
+                        ledgerType: "DEPOSIT",
+                        auditAction: "DEPOSIT_COMPLETED"
                     })
                 } catch (error) {
                     console.error("Failed to deposit!", error)
@@ -427,6 +475,43 @@ export default {
                 })
 
                 return interaction.reply({ ...message("Deposit complete", `**Amount:** ${currency} ${formatCurrency(ledger.amount)}\n**Reserve:** ${formatAccountNumber(reserve)}\n**Receiving account:** ${formatAccountNumber(account)}`, undefined, `Transaction ID: ${ledger.uuid}`), flags: MessageFlags.Ephemeral })
+            }
+
+            case "withdraw": {
+                const reserve = interaction.options.getString("reserve")
+                const account = interaction.options.getString("account")
+                const rawAmount = interaction.options.getNumber("amount")
+                const currency = interaction.options.getString("currency")
+
+                const [reserveAccount, customerAccount, user] = await Promise.all([
+                    accountFromNumber(reserve),
+                    accountFromNumber(account),
+                    userFromDiscord(interaction.user.id)
+                ])
+                if (!reserveAccount || reserveAccount.type !== "Reserve") {
+                    return interaction.reply({ ...message("Reserve account unavailable", "Check the reserve account number and try again.", "RESERVE_ACCOUNT_NOT_FOUND"), flags: MessageFlags.Ephemeral })
+                }
+                if (!customerAccount || customerAccount.type === "Reserve") {
+                    return interaction.reply({ ...message("Customer account unavailable", "Choose a valid customer account and try again.", "CUSTOMER_ACCOUNT_NOT_FOUND"), flags: MessageFlags.Ephemeral })
+                }
+                if (!user) {
+                    return interaction.reply({ ...message("Staff profile required", "Your staff account is not linked to a customer profile.", "PROFILE_NOT_FOUND"), flags: MessageFlags.Ephemeral })
+                }
+
+                let ledger
+                try {
+                    ledger = await transfer(customerAccount, reserveAccount, rawAmount, currency, "Account Withdrawal", user, {
+                        bypassStatus: true,
+                        notifyAudit: true,
+                        ledgerType: "WITHDRAWAL",
+                        auditAction: "WITHDRAWAL_COMPLETED"
+                    })
+                } catch (error) {
+                    console.error("Failed to withdraw!", error)
+                    return interaction.reply({ ...withdrawalErrorMessage(error), flags: MessageFlags.Ephemeral })
+                }
+
+                return interaction.reply({ ...message("Withdrawal complete", `**Amount:** ${currency} ${formatCurrency(ledger.amount)}\n**Customer account:** ${formatAccountNumber(account)}\n**Reserve:** ${formatAccountNumber(reserve)}`, undefined, `Transaction ID: ${ledger.uuid}`), flags: MessageFlags.Ephemeral })
             }
 
             case "open": {
@@ -473,7 +558,7 @@ export default {
 		switch(focused.name) {
             case "account":
             case "reserve": {
-                const filtersByDepositType = command === "deposit"
+                const filtersByDepositType = command === "deposit" || command === "withdraw"
                 const reserveOnly = focused.name === "reserve"
                 const accountFilters = filtersByDepositType
                     ? [

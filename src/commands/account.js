@@ -212,6 +212,26 @@ export default {
 
             .addSubcommand((subcommand) =>
                 subcommand
+                    .setName("deposit")
+                    .setDescription("Request a deposit into one of your accounts")
+                    .addStringOption(option => option
+                        .setName("account")
+                        .setDescription("The account to deposit into")
+                        .setRequired(true)
+                        .setAutocomplete(true))
+                    .addNumberOption(option => option
+                        .setName("amount")
+                        .setDescription("The requested deposit amount")
+                        .setRequired(true))
+                    .addStringOption(option => option
+                        .setName("currency")
+                        .setDescription("The requested currency")
+                        .setRequired(true)
+                        .addChoices(config.currencies.map(currency => ({ name: currency, value: currency }))))
+            )
+
+            .addSubcommand((subcommand) =>
+                subcommand
                     .setName("withdraw")
                     .setDescription("Request a withdrawal from one of your accounts")
                     .addStringOption(option => option
@@ -225,7 +245,8 @@ export default {
                         .setRequired(true))
                     .addStringOption(option => option
                         .setName("currency")
-                        .setDescription("The requested currency (HC$ only for now)")
+                        .setDescription("The requested currency")
+                        .setRequired(true)
                         .addChoices(config.currencies.map(currency => ({ name: currency, value: currency }))))
             )
 
@@ -353,74 +374,61 @@ export default {
                 return interaction.reply({ ...message("Account unblocked", `**${requestingAccount.name}** can send you payment requests again.`), flags: MessageFlags.Ephemeral })
             }
 
+            case "deposit":
             case "withdraw": {
-                const currency = interaction.options.getString("currency") || "HC$"
-
-                if (currency !== "HC$") {
-                    return interaction.reply({ ...message("Currency unavailable", "Withdrawals in that currency are not available right now. Please choose HC$.", "WITHDRAWAL_CURRENCY_UNAVAILABLE"), flags: MessageFlags.Ephemeral })
-                }
-
+                const type = command === "deposit" ? "DEPOSIT" : "WITHDRAWAL"
+                const currency = interaction.options.getString("currency")
                 const amount = interaction.options.getNumber("amount")
-
-                if (!Number.isFinite(amount) || amount <= 0 || amount >= 100000000 || Number(amount.toFixed(2)) !== amount) {
-                    return interaction.reply({ ...message("Invalid amount", "Enter an HC$ amount greater than zero, with no more than two decimal places.", "INVALID_AMOUNT"), flags: MessageFlags.Ephemeral })
-                }
-
                 const user = await userFromDiscord(interaction.user.id)
 
                 if (!user) {
                     return interaction.reply({ ...message("Profile required", "We could not find your customer profile. Please complete registration or contact support.", "PROFILE_NOT_FOUND"), flags: MessageFlags.Ephemeral })
                 }
+                if (!Number.isFinite(amount) || amount <= 0 || amount >= 100000000 || Number(amount.toFixed(2)) !== amount) {
+                    return interaction.reply({ ...message("Invalid amount", "Enter an amount greater than zero, with no more than two decimal places.", "INVALID_AMOUNT"), flags: MessageFlags.Ephemeral })
+                }
 
                 const account = await accountFromNumber(interaction.options.getString("account"))
-
-                if (!account || !await hasAccountAccess(user, account, config.accountAccesses.Signatory)) {
-                    return interaction.reply({ ...message("Account unavailable", "Check the account number and make sure you are authorised to withdraw from it.", "WITHDRAWAL_ACCOUNT_UNAVAILABLE"), flags: MessageFlags.Ephemeral })
+                if (!account || account.type === "Reserve" || !await hasAccountAccess(user, account, config.accountAccesses.Signatory)) {
+                    return interaction.reply({ ...message("Account unavailable", "Choose a customer account where you have Signatory access.", "REQUEST_ACCOUNT_UNAVAILABLE"), flags: MessageFlags.Ephemeral })
                 }
-
                 if (account.status !== "ACTIVE") {
-                    return interaction.reply({ ...message("Withdrawal unavailable", "This account cannot currently make withdrawals. Please contact support.", `ACCOUNT_${account.status}`), flags: MessageFlags.Ephemeral })
-                }
-
-                const balance = await AccountBalance.findOne({ where: { accountId: account.id, currency } })
-
-                if (!balance || Number(balance.balance) < amount) {
-                    return interaction.reply({ ...message("Insufficient funds", "This account does not have enough HC$ for the requested withdrawal.", "INSUFFICIENT_FUNDS"), flags: MessageFlags.Ephemeral })
+                    return interaction.reply({ ...message("Request unavailable", "This account cannot currently make deposit or withdrawal requests.", `ACCOUNT_${account.status}`), flags: MessageFlags.Ephemeral })
                 }
 
                 await interaction.deferReply({ flags: MessageFlags.Ephemeral })
                 let request
                 let staffMessage
-
                 try {
-                    const channel = await interaction.client.channels.fetch(config.withdrawalChannelId)
-
-                    if (!channel || typeof channel.send !== "function") throw new Error("WITHDRAWAL_CHANNEL_UNAVAILABLE")
+                    const channel = await interaction.client.channels.fetch(config.requestChannelId || config.withdrawalChannelId)
+                    if (!channel || typeof channel.send !== "function") throw new Error("REQUEST_CHANNEL_UNAVAILABLE")
 
                     request = await Withdrawal.create({
                         requesterId: user.id,
                         accountId: account.id,
                         amount,
                         currency,
+                        type,
                         status: "PENDING"
                     })
-
-                    const notification = message("Withdrawal requested", `**Customer:** <@${interaction.user.id}>\n**Account:** ${account.name} (${formatAccountNumber(account.number)})\n**Amount:** HC$ ${formatCurrency(amount)}\n**Status:** Pending`, undefined, `Request #${request.id}`)
+                    const label = type === "DEPOSIT" ? "Deposit" : "Withdrawal"
+                    const notification = message(`${label} requested`, `**Customer:** <@${interaction.user.id}>\n**Account:** ${account.name} (${formatAccountNumber(account.number)})\n**Amount:** ${currency} ${formatCurrency(amount)}\n**Status:** Pending`, undefined, `Request #${request.id}`)
                     notification.allowedMentions = { parse: [] }
                     notification.components = [new ActionRowBuilder().addComponents(
-                        new ButtonBuilder().setCustomId(`withdraw_${request.id}_complete`).setLabel("Complete").setStyle(ButtonStyle.Success),
-                        new ButtonBuilder().setCustomId(`withdraw_${request.id}_cancel`).setLabel("Cancel").setStyle(ButtonStyle.Danger)
+                        new ButtonBuilder().setCustomId(`cashrequest_${request.id}_complete`).setLabel("Complete").setStyle(ButtonStyle.Success),
+                        new ButtonBuilder().setCustomId(`cashrequest_${request.id}_decline`).setLabel("Decline").setStyle(ButtonStyle.Danger)
                     )]
                     staffMessage = await channel.send(notification)
                     await request.update({ messageId: staffMessage.id })
                 } catch (error) {
-                    console.error("Failed to submit withdrawal request:", error)
+                    console.error(`Failed to submit ${type.toLowerCase()} request:`, error)
                     if (request) await request.update({ status: "CANCELLED" }).catch(console.error)
                     if (staffMessage) await staffMessage.delete().catch(console.error)
-                    return interaction.editReply(message("Request not submitted", "We could not submit your withdrawal request. No money was moved. Please try again or contact support.", "WITHDRAWAL_REQUEST_FAILED"))
+                    return interaction.editReply(message("Request not submitted", "The staff request could not be delivered. No money was moved.", "ACCOUNT_REQUEST_FAILED"))
                 }
 
-                return interaction.editReply(message("Withdrawal requested", `Your request for **HC$ ${formatCurrency(amount)}** from **${account.name}** has been sent to staff. You will receive a DM when it is completed or cancelled, if your DMs are open.`, undefined, `Request #${request.id}`))
+                const label = type === "DEPOSIT" ? "Deposit" : "Withdrawal"
+                return interaction.editReply(message(`${label} requested`, `Your request for **${currency} ${formatCurrency(amount)}** involving **${account.name}** was sent to staff. This request does not move money by itself.`, undefined, `Request #${request.id}`))
             }
 
             case "logs": {
@@ -684,10 +692,11 @@ export default {
                     })))
                 }
 
-                const requiredAccess = focused.name === "from" || command === "withdraw" || (requestGroup && command === "send")
+                const cashRequest = command === "deposit" || command === "withdraw"
+                const requiredAccess = focused.name === "from" || cashRequest || (requestGroup && command === "send")
                     ? config.accountAccesses.Signatory
                     : config.accountAccesses.Viewer
-                const statusFilter = focused.name === "from" || command === "withdraw" || (requestGroup && command === "send")
+                const statusFilter = focused.name === "from" || cashRequest || (requestGroup && command === "send")
                     ? { status: "ACTIVE" }
                     : undefined
                 const accounts = await Account.findAll({
@@ -697,7 +706,8 @@ export default {
                             { number: { [Op.like]: `%${focused.value}%` } },
                             { name: { [Op.like]: `%${focused.value}%` } }
                         ]},
-                        ...(statusFilter ? [statusFilter] : [])
+                        ...(statusFilter ? [statusFilter] : []),
+                        ...(cashRequest ? [{ type: { [Op.ne]: "Reserve" } }] : [])
                     ]},
 
                     include: [{

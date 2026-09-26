@@ -16,8 +16,13 @@ const actionNames = {
     ACCOUNT_FROZEN: "Account frozen",
     ACCOUNT_CLOSED: "Account closed",
     TRANSFER: "Transfer completed",
+    DEPOSIT_COMPLETED: "Deposit completed",
     WITHDRAWAL_COMPLETED: "Withdrawal completed",
     WITHDRAWAL_CANCELLED: "Withdrawal cancelled",
+    DEPOSIT_REQUEST_COMPLETED: "Deposit request completed",
+    DEPOSIT_REQUEST_DECLINED: "Deposit request declined",
+    WITHDRAWAL_REQUEST_COMPLETED: "Withdrawal request completed",
+    WITHDRAWAL_REQUEST_DECLINED: "Withdrawal request declined",
     DIRECT_DEBIT_AUTHORIZED: "Direct debit authorized",
     DIRECT_DEBIT_COLLECTED: "Direct debit collected",
     DIRECT_DEBIT_REVOKED: "Direct debit revoked",
@@ -76,7 +81,7 @@ function auditDetails(log, targets, showActor, showAccount) {
         }
     }
 
-    if (["TRANSFER", "WITHDRAWAL_COMPLETED", "DIRECT_DEBIT_COLLECTED", "PAYMENT_REQUEST_ACCEPTED"].includes(log.action)) {
+    if (["TRANSFER", "DEPOSIT_COMPLETED", "WITHDRAWAL_COMPLETED", "DIRECT_DEBIT_COLLECTED", "PAYMENT_REQUEST_ACCEPTED"].includes(log.action)) {
         if (log.before?.balance !== undefined && log.after?.balance !== undefined) {
             details.push(`**Balance change:** ${formatCurrency(log.before.balance)} → ${formatCurrency(log.after.balance)}`)
         }
@@ -89,6 +94,15 @@ function auditDetails(log, targets, showActor, showAccount) {
     if (log.action === "WITHDRAWAL_CANCELLED") {
         if (log.after?.requestId) details.push(`**Request:** #${log.after.requestId}`)
         details.push("**Status:** Cancelled")
+    }
+
+    if ([
+        "DEPOSIT_REQUEST_COMPLETED", "DEPOSIT_REQUEST_DECLINED",
+        "WITHDRAWAL_REQUEST_COMPLETED", "WITHDRAWAL_REQUEST_DECLINED"
+    ].includes(log.action)) {
+        const requestId = log.after?.requestId ?? log.before?.requestId
+        if (requestId) details.push(`**Request:** #${requestId}`)
+        if (log.after?.status) details.push(`**Status:** ${log.after.status}`)
     }
 
     if (log.action === "ACCOUNT_CREATED") {

@@ -112,6 +112,7 @@ export const withdrawal = (sequelize) => sequelize.define("withdrawal", {
     accountId: { type: DataTypes.BIGINT, allowNull: false },
     amount: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
     currency: { type: DataTypes.STRING, allowNull: false, defaultValue: "HC$" },
+    type: { type: DataTypes.STRING, allowNull: false, defaultValue: "WITHDRAWAL" },
     status: { type: DataTypes.STRING, allowNull: false, defaultValue: "PENDING" },
     messageId: { type: DataTypes.STRING },
     processorId: { type: DataTypes.BIGINT },
