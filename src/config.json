@@ -2,6 +2,7 @@
     "accounts": {
         "General": {
             "type": "personal",
+            "numberGroups": 4,
             "access": {
                 "Holder": 1
             }
@@ -9,6 +10,7 @@
 
         "Business": {
             "type": "business",
+            "numberGroups": 2,
             "role": "Business Account Holder",
             "access": {
                 "Viewer": true,
@@ -19,6 +21,7 @@
         
         "Enterprize": {
             "type": "business",
+            "numberGroups": 1,
             "role": "Business Account Holder",
             "access": {
                 "Viewer": true,
@@ -29,6 +32,7 @@
 
         "Exclusive": {
             "type": "personal",
+            "numberGroups": 3,
             "role": "Exclusive Account Holder",
             "access": {
                 "Holder": 1
@@ -37,6 +41,7 @@
 
         "Executive": {
             "type": "personal",
+            "numberGroups": 1,
             "role": "Executive Account Holder",
             "access": {
                 "Holder": 1
@@ -45,6 +50,7 @@
 
         "Reserve": {
             "type": "reserve",
+            "numberGroups": 4,
             "access": {
                 "Holder": 1
             }
@@ -76,6 +82,7 @@
     },
 
     "currencies": ["HC$", "RW$", "CC$"],
+    "timezone": "Europe/London",
     "auditChannelId": "1553367619162210414",
     "withdrawalChannelId": "1553356007961268324"
 }

@@ -1,8 +1,25 @@
 import { Account, AccountAccess, AccountBalance, Ledger, sequelize } from "#models/models"
 import config from "#config" with { type: 'json' }
-import { Op } from "sequelize"
+import { Op, UniqueConstraintError } from "sequelize"
 import generateAccountNumber from "#functions/util/generateAccountNumber"
 import { queueAuditLogNotification } from "#functions/util/auditLogNotifications"
+
+export async function generateUniqueAccountNumber(numberGroups, transaction) {
+    if (!Number.isInteger(numberGroups) || numberGroups < 1) {
+        throw new Error("INVALID_ACCOUNT_NUMBER_GROUPS")
+    }
+
+    while (true) {
+        const number = generateAccountNumber(numberGroups)
+        const existingAccount = await Account.findOne({
+            attributes: ["id"],
+            where: { number },
+            transaction
+        })
+
+        if (!existingAccount) return number
+    }
+}
 
 export async function createAccount(owner, type = "General", chosenName, { notifyAudit = false, auditActor = owner } = {}) {
     if (!owner) {
@@ -22,37 +39,47 @@ export async function createAccount(owner, type = "General", chosenName, { notif
     }
 
     const name = chosenName || `${owner.robloxName}'s ${type} Account`
+    const numberGroups = accountConfig.numberGroups
 
-    try {
-        const result = sequelize.transaction(async transaction => {
-            const account = await Account.create({
-                status: "ACTIVE",
-                type,
-                name,
-                number: await generateAccountNumber(4)
-            }, {transaction})
-
-            await owner.addAccount(account, {
-                through: { access: config.accountAccesses.Holder },
-                transaction
-            })
-
-            const auditLog = await auditActor.createAuditLog({
-                accountId: account.id,
-                action: "ACCOUNT_CREATED",
-                before: null,
-                after: account.toJSON()
-            }, {transaction})
-            if (notifyAudit) queueAuditLogNotification(auditLog, transaction)
-
-            return account
-        })
-
-        return result
-    } catch (error) {
-        console.error(error)
-
+    if (!Number.isInteger(numberGroups) || numberGroups < 1) {
+        console.error(`Invalid account numberGroups configuration for ${type}.`)
         return null
+    }
+
+    while (true) {
+        try {
+            return await sequelize.transaction(async transaction => {
+                const account = await Account.create({
+                    status: "ACTIVE",
+                    type,
+                    name,
+                    number: await generateUniqueAccountNumber(numberGroups, transaction)
+                }, {transaction})
+
+                await owner.addAccount(account, {
+                    through: { access: config.accountAccesses.Holder },
+                    transaction
+                })
+
+                const auditLog = await auditActor.createAuditLog({
+                    accountId: account.id,
+                    action: "ACCOUNT_CREATED",
+                    before: null,
+                    after: account.toJSON()
+                }, {transaction})
+                if (notifyAudit) queueAuditLogNotification(auditLog, transaction)
+
+                return account
+            })
+        } catch (error) {
+            const numberCollision = error instanceof UniqueConstraintError
+                && error.errors?.some(item => item.path === "number")
+
+            if (numberCollision) continue
+
+            console.error(error)
+            return null
+        }
     }
 }
 

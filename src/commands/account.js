@@ -18,6 +18,7 @@ import message from "#functions/templates/message"
 import notifyIncomingPayment from "#functions/util/notifyIncomingPayment"
 import { accountTransactionDetails, accountTransactionsPage } from "#functions/util/accountTransactions"
 import { auditLogPage } from "#functions/util/auditLogs"
+import { currentWeekAccountActivity } from "#functions/util/accountActivity"
 
 const REMOVE_ACCOUNT_ACCESS = 0
 
@@ -74,6 +75,12 @@ function accessFields(users, currentDiscordId) {
         name: index === 0 ? "Other account access" : `Other account access (${index + 1})`,
         value
     }))
+}
+
+function activityText(totals) {
+    return totals.length
+        ? totals.map(total => `**${total.currency}:** ${formatCurrency(total.total)}`).join("\n")
+        : "No activity"
 }
 
 export default {
@@ -422,7 +429,7 @@ export default {
                     return interaction.reply({ ...message("Account unavailable", "Check the account number and make sure you have permission to view this account.", "ACCOUNT_UNAVAILABLE"), flags: MessageFlags.Ephemeral })
                 }
 
-                const [balances, accountUsers] = await Promise.all([
+                const [balances, accountUsers, weeklyActivity] = await Promise.all([
                     selectedAccount.getAccountBalances({
                         attributes: ["balance", "currency"],
                         order: [["currency", "ASC"]]
@@ -430,7 +437,8 @@ export default {
                     selectedAccount.getUsers({
                         attributes: ["discordId", "robloxName"],
                         through: { attributes: ["access"] }
-                    })
+                    }),
+                    currentWeekAccountActivity(selectedAccount.id)
                 ])
                 const createdAt = Math.floor(selectedAccount.createdAt.getTime() / 1000)
                 const updatedAt = Math.floor(selectedAccount.updatedAt.getTime() / 1000)
@@ -457,6 +465,16 @@ export default {
                     {
                         name: "Balances",
                         value: balanceText
+                    },
+                    {
+                        name: "Incoming · This week",
+                        value: activityText(weeklyActivity.incoming),
+                        inline: true
+                    },
+                    {
+                        name: "Outgoing · This week",
+                        value: activityText(weeklyActivity.outgoing),
+                        inline: true
                     },
                     ...accessFields(accountUsers, interaction.user.id),
                     {
