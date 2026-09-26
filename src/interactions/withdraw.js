@@ -103,7 +103,7 @@ export default {
                         before: { status: "PENDING", requestId: request.id },
                         after: { status: "CANCELLED", requestId: request.id }
                     }, { transaction })
-                    queueAuditLogNotification(auditLog, transaction)
+                    queueAuditLogNotification(auditLog, transaction, { central: true })
                     return { request, outcome: "CANCELLED" }
                 }
 

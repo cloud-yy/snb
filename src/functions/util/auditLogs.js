@@ -17,7 +17,15 @@ const actionNames = {
     ACCOUNT_CLOSED: "Account closed",
     TRANSFER: "Transfer completed",
     WITHDRAWAL_COMPLETED: "Withdrawal completed",
-    WITHDRAWAL_CANCELLED: "Withdrawal cancelled"
+    WITHDRAWAL_CANCELLED: "Withdrawal cancelled",
+    DIRECT_DEBIT_AUTHORIZED: "Direct debit authorized",
+    DIRECT_DEBIT_COLLECTED: "Direct debit collected",
+    DIRECT_DEBIT_REVOKED: "Direct debit revoked",
+    BUSINESS_LOG_CHANNEL_UPDATED: "Business log channel updated",
+    PAYMENT_REQUEST_SENT: "Payment request sent",
+    PAYMENT_REQUEST_ACCEPTED: "Payment request accepted",
+    PAYMENT_REQUEST_DENIED: "Payment request denied",
+    PAYMENT_REQUEST_BLOCKED: "Payment requests blocked"
 }
 
 function accessName(access) {
@@ -68,7 +76,7 @@ function auditDetails(log, targets, showActor, showAccount) {
         }
     }
 
-    if (["TRANSFER", "WITHDRAWAL_COMPLETED"].includes(log.action)) {
+    if (["TRANSFER", "WITHDRAWAL_COMPLETED", "DIRECT_DEBIT_COLLECTED", "PAYMENT_REQUEST_ACCEPTED"].includes(log.action)) {
         if (log.before?.balance !== undefined && log.after?.balance !== undefined) {
             details.push(`**Balance change:** ${formatCurrency(log.before.balance)} → ${formatCurrency(log.after.balance)}`)
         }
@@ -85,6 +93,20 @@ function auditDetails(log, targets, showActor, showAccount) {
 
     if (log.action === "ACCOUNT_CREATED") {
         if (log.after?.type) details.push(`**Type:** ${log.after.type}`)
+        if (log.after?.status) details.push(`**Status:** ${log.after.status}`)
+    }
+
+    if (log.action === "BUSINESS_LOG_CHANNEL_UPDATED") {
+        details.push(`**Log:** ${log.after?.kind || "Unknown"}`)
+        if (log.before?.channelId) details.push(`**Previous channel:** <#${log.before.channelId}>`)
+        if (log.after?.channelId) details.push(`**New channel:** <#${log.after.channelId}>`)
+    }
+
+    if (["PAYMENT_REQUEST_SENT", "PAYMENT_REQUEST_DENIED", "PAYMENT_REQUEST_BLOCKED"].includes(log.action)) {
+        const requestId = log.after?.requestId ?? log.before?.requestId
+        if (requestId) details.push(`**Request:** #${requestId}`)
+        if (log.after?.amount !== undefined) details.push(`**Amount:** ${log.after.currency} ${formatCurrency(log.after.amount)}`)
+        if (log.after?.reference) details.push(`**Reference:** ${String(log.after.reference).slice(0, 100)}`)
         if (log.after?.status) details.push(`**Status:** ${log.after.status}`)
     }
 

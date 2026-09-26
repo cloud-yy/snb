@@ -3,6 +3,7 @@ import config from "#config" with { type: 'json' }
 import { Op, UniqueConstraintError } from "sequelize"
 import generateAccountNumber from "#functions/util/generateAccountNumber"
 import { queueAuditLogNotification } from "#functions/util/auditLogNotifications"
+import { queueBusinessTransactionNotification } from "#functions/util/businessLogNotifications"
 
 export async function generateUniqueAccountNumber(numberGroups, transaction) {
     if (!Number.isInteger(numberGroups) || numberGroups < 1) {
@@ -67,7 +68,7 @@ export async function createAccount(owner, type = "General", chosenName, { notif
                     before: null,
                     after: account.toJSON()
                 }, {transaction})
-                if (notifyAudit) queueAuditLogNotification(auditLog, transaction)
+                if (notifyAudit) queueAuditLogNotification(auditLog, transaction, { central: true })
 
                 return account
             })
@@ -155,12 +156,13 @@ export async function removeAccountAccess(actor, user, account) {
 
         await existingAccess.destroy({ transaction })
 
-        await actor.createAuditLog({
+        const auditLog = await actor.createAuditLog({
             accountId: account.id,
             action: "ACCOUNT_ACCESS_REMOVED",
             before,
             after: null
         }, { transaction })
+        queueAuditLogNotification(auditLog, transaction, { central: false })
     })
 }
 
@@ -196,7 +198,7 @@ export async function setAccountStatus(actor, account, status, reason, { notifyA
             before,
             after: { status, reason: cleanReason }
         }, { transaction })
-        if (notifyAudit) queueAuditLogNotification(auditLog, transaction)
+        queueAuditLogNotification(auditLog, transaction, { central: notifyAudit })
 
         return lockedAccount
     })
@@ -265,7 +267,7 @@ export async function setAccountAccess(actor, user, account, access, { bypassLim
             before,
             after: { userId: user.id, access }
         }, { transaction })
-        if (notifyAudit) queueAuditLogNotification(auditLog, transaction)
+        queueAuditLogNotification(auditLog, transaction, { central: notifyAudit })
 
         return access
     })
@@ -277,7 +279,9 @@ export async function transfer(from, to, rawAmount, currency, reference, user, {
     notifyAudit = false,
     transaction: existingTransaction,
     ledgerType = "TRANSFER",
-    auditAction = "TRANSFER"
+    auditAction = "TRANSFER",
+    directDebitId = null,
+    authorize
 } = {}) {
     if (from.id === to.id) {
         throw new Error("SAME_ACCOUNT")
@@ -295,7 +299,7 @@ export async function transfer(from, to, rawAmount, currency, reference, user, {
 
     const performTransfer = async transaction => {
         const lockedAccounts = await Account.findAll({
-            attributes: ["id", "status"],
+            attributes: ["id", "status", "type"],
             where: { id: { [Op.in]: [from.id, to.id] } },
             order: [["id", "ASC"]],
             transaction,
@@ -313,6 +317,8 @@ export async function transfer(from, to, rawAmount, currency, reference, user, {
         if (!bypassStatus && lockedAccounts.some(account => account.status === "FROZEN")) {
             throw new Error("ACCOUNT_FROZEN")
         }
+
+        if (authorize) await authorize(lockedAccounts, transaction)
 
         const fromFirst = String(from.id) < String(to.id)
         const firstAccount = fromFirst ? from : to
@@ -382,8 +388,11 @@ export async function transfer(from, to, rawAmount, currency, reference, user, {
             currency,
             status: "SUCCESS",
             type: ledgerType,
+            directDebitId,
             reference
         }, { transaction })
+
+        queueBusinessTransactionNotification(ledger, transaction)
 
         if (user) {
             await fromBalance.reload({ transaction })
@@ -395,7 +404,7 @@ export async function transfer(from, to, rawAmount, currency, reference, user, {
                 accountId: from.id,
                 ledgerId: ledger.id
             }, { transaction })
-            if (notifyAudit) queueAuditLogNotification(auditLog, transaction)
+            queueAuditLogNotification(auditLog, transaction, { central: notifyAudit })
         }
 
         return ledger

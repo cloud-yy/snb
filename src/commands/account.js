@@ -7,20 +7,19 @@ import {
     MessageFlags,
     SlashCommandBuilder
 } from "discord.js"
-import { Account, AccountBalance, User, Withdrawal } from "#models/models"
+import { Account, AccountBalance, PaymentRequestBlock, User, Withdrawal } from "#models/models"
 import config from "#config" with { type: 'json' }
 import { Op } from "sequelize"
 import formatAccountNumber from "#functions/util/formatAccountNumber"
 import formatCurrency from "#functions/util/formatCurrency"
-import { accountFromNumber, getAccountAccess, hasAccountAccess, removeAccountAccess, setAccountAccess, transfer } from "#functions/db/account"
+import { accountFromNumber, getAccountAccess, hasAccountAccess, transfer } from "#functions/db/account"
 import { userFromDiscord } from "#functions/db/user"
 import message from "#functions/templates/message"
 import notifyIncomingPayment from "#functions/util/notifyIncomingPayment"
 import { accountTransactionDetails, accountTransactionsPage } from "#functions/util/accountTransactions"
 import { auditLogPage } from "#functions/util/auditLogs"
 import { currentWeekAccountActivity } from "#functions/util/accountActivity"
-
-const REMOVE_ACCOUNT_ACCESS = 0
+import { createPaymentRequest, unblockPaymentRequests } from "#functions/db/paymentRequest"
 
 function transferErrorMessage(error) {
     switch (error?.message) {
@@ -230,36 +229,43 @@ export default {
                         .addChoices(config.currencies.map(currency => ({ name: currency, value: currency }))))
             )
 
-            .addSubcommand((subcommand) =>
-                subcommand
-                    .setName("access")
-                    .setDescription("Sets or removes a user's access to an account")
-                    .addStringOption((option) =>
-                        option
-                            .setName("account")
-                            .setDescription("The account to manage")
-                            .setRequired(true)
-                            .setAutocomplete(true)
-                    )
-                    .addUserOption((option) =>
-                        option
-                            .setName("user")
-                            .setDescription("The user whose access will be set")
-                            .setRequired(true)
-                    )
-                    .addIntegerOption((option) =>
-                        option
-                            .setName("role")
-                            .setDescription("The user's account role, or Remove to revoke access")
-                            .setRequired(true)
-                            .addChoices(
-                                ...Object.entries(config.accountAccesses)
-                                    .filter(([name]) => name !== "Holder")
-                                    .map(([name, value]) => ({ name, value })),
-                                { name: "Remove", value: REMOVE_ACCOUNT_ACCESS }
-                            )
-                    )
-            ),
+            .addSubcommandGroup(group => group
+                .setName("request")
+                .setDescription("Request a payment from another customer")
+                .addSubcommand(subcommand => subcommand
+                    .setName("send")
+                    .setDescription("Send a payment request")
+                    .addStringOption(option => option
+                        .setName("account")
+                        .setDescription("The account that will receive the payment")
+                        .setRequired(true)
+                        .setAutocomplete(true))
+                    .addUserOption(option => option
+                        .setName("user")
+                        .setDescription("The customer to request payment from")
+                        .setRequired(true))
+                    .addNumberOption(option => option
+                        .setName("amount")
+                        .setDescription("The amount to request")
+                        .setRequired(true))
+                    .addStringOption(option => option
+                        .setName("currency")
+                        .setDescription("The currency to request")
+                        .setRequired(true)
+                        .addChoices(config.currencies.map(currency => ({ name: currency, value: currency }))))
+                    .addStringOption(option => option
+                        .setName("reference")
+                        .setDescription("The payment reference")
+                        .setMinLength(1)
+                        .setMaxLength(18)))
+                .addSubcommand(subcommand => subcommand
+                    .setName("unblock")
+                    .setDescription("Allow an account to send you payment requests again")
+                    .addStringOption(option => option
+                        .setName("account")
+                        .setDescription("The previously blocked requesting account")
+                        .setRequired(true)
+                        .setAutocomplete(true)))),
 
     cooldown: 0,
     scope: "global",
@@ -268,6 +274,85 @@ export default {
         const command = interaction.options.getSubcommand()
 
         switch(command) {
+            case "send": {
+                const requester = await userFromDiscord(interaction.user.id)
+                const discordTarget = interaction.options.getUser("user")
+                if (!requester) {
+                    return interaction.reply({ ...message("Profile required", "Complete registration before sending payment requests.", "PROFILE_NOT_FOUND"), flags: MessageFlags.Ephemeral })
+                }
+                if (!discordTarget || discordTarget.bot || discordTarget.id === interaction.user.id) {
+                    return interaction.reply({ ...message("Customer unavailable", "Choose another registered customer.", "PAYMENT_REQUEST_TARGET_UNAVAILABLE"), flags: MessageFlags.Ephemeral })
+                }
+
+                const [target, receivingAccount] = await Promise.all([
+                    User.findOne({ attributes: ["id", "discordId"], where: { discordId: discordTarget.id, robloxId: { [Op.ne]: null } } }),
+                    accountFromNumber(interaction.options.getString("account"))
+                ])
+                if (!target) {
+                    return interaction.reply({ ...message("Customer unavailable", "That user does not have a registered customer profile.", "PAYMENT_REQUEST_TARGET_UNAVAILABLE"), flags: MessageFlags.Ephemeral })
+                }
+
+                let request
+                try {
+                    request = await createPaymentRequest(
+                        requester,
+                        target,
+                        receivingAccount,
+                        interaction.options.getNumber("amount"),
+                        interaction.options.getString("currency"),
+                        interaction.options.getString("reference")
+                    )
+                } catch (error) {
+                    if (error?.message === "PAYMENT_REQUEST_BLOCKED") {
+                        return interaction.reply({ ...message("Request blocked", "This account cannot send payment requests to that customer.", "PAYMENT_REQUEST_BLOCKED"), flags: MessageFlags.Ephemeral })
+                    }
+                    if (error?.message === "INVALID_AMOUNT" || error?.message === "INVALID_PAYMENT_REQUEST") {
+                        return interaction.reply({ ...message("Invalid payment request", "Enter a positive amount with no more than two decimal places and a valid reference.", error.message), flags: MessageFlags.Ephemeral })
+                    }
+                    return interaction.reply({ ...message("Request not sent", "Check the account and make sure you have Signatory access, then try again.", "PAYMENT_REQUEST_FAILED"), flags: MessageFlags.Ephemeral })
+                }
+
+                const notification = {
+                    ...message(
+                        "Payment requested",
+                        `**From:** ${receivingAccount.name} (${formatAccountNumber(receivingAccount.number)})\n**Amount:** ${request.currency} ${formatCurrency(request.amount)}\n**Reference:** ${request.reference}\n\nAccept to choose one of your accounts to pay from. Blocking stops this account from sending you more payment requests.`,
+                        undefined,
+                        `Request #${request.id}`
+                    ),
+                    components: [new ActionRowBuilder().addComponents(
+                        new ButtonBuilder().setCustomId(`request_${request.id}_accept`).setLabel("Accept").setStyle(ButtonStyle.Success),
+                        new ButtonBuilder().setCustomId(`request_${request.id}_deny`).setLabel("Deny").setStyle(ButtonStyle.Secondary),
+                        new ButtonBuilder().setCustomId(`request_${request.id}_block`).setLabel("Block account").setStyle(ButtonStyle.Danger)
+                    )],
+                    allowedMentions: { parse: [] }
+                }
+
+                try {
+                    const dm = await discordTarget.send(notification)
+                    await request.update({ messageId: dm.id })
+                } catch (error) {
+                    console.error(`Could not DM payment request ${request.id}:`, error)
+                    await request.update({ status: "CANCELLED" }).catch(console.error)
+                    return interaction.reply({ ...message("Request not delivered", "The customer could not be sent a DM. No payment request remains active.", "PAYMENT_REQUEST_DM_FAILED"), flags: MessageFlags.Ephemeral })
+                }
+
+                return interaction.reply({ ...message("Payment request sent", `${discordTarget} was asked to pay **${request.currency} ${formatCurrency(request.amount)}** to **${receivingAccount.name}**.`, undefined, `Request #${request.id}`), flags: MessageFlags.Ephemeral })
+            }
+
+            case "unblock": {
+                const target = await userFromDiscord(interaction.user.id)
+                const requestingAccount = await accountFromNumber(interaction.options.getString("account"))
+                if (!target) {
+                    return interaction.reply({ ...message("Profile required", "Complete registration before managing blocked requests.", "PROFILE_NOT_FOUND"), flags: MessageFlags.Ephemeral })
+                }
+                try {
+                    await unblockPaymentRequests(target, requestingAccount)
+                } catch (error) {
+                    return interaction.reply({ ...message("Block not found", "That account is not currently blocked from sending you payment requests.", "PAYMENT_REQUEST_BLOCK_NOT_FOUND"), flags: MessageFlags.Ephemeral })
+                }
+                return interaction.reply({ ...message("Account unblocked", `**${requestingAccount.name}** can send you payment requests again.`), flags: MessageFlags.Ephemeral })
+            }
+
             case "withdraw": {
                 const currency = interaction.options.getString("currency") || "HC$"
 
@@ -563,106 +648,7 @@ export default {
                 return interaction.reply({ ...message("Transfer complete", `**Amount:** ${currency} ${formatCurrency(ledger.amount)}\n**From:** ${formatAccountNumber(from)}\n**To:** ${formatAccountNumber(to)}`, undefined, `Transaction ID: ${ledger.uuid}`), flags: show ? undefined : MessageFlags.Ephemeral })
             }
 
-            case "access": {
-                const accountNumber = interaction.options.getString("account")
-                const discordUser = interaction.options.getUser("user")
-                const requestedAccess = interaction.options.getInteger("role")
-                const removeAccess = requestedAccess === REMOVE_ACCOUNT_ACCESS
-                const roleName = Object.entries(config.accountAccesses)
-                    .find(([, access]) => access === requestedAccess)?.[0]
-                const selectedAccount = await accountFromNumber(accountNumber)
-                const actor = await userFromDiscord(interaction.user.id)
 
-                if (!removeAccess && !roleName) {
-                    return interaction.reply({ ...message("Role not recognised", "Choose one of the available account roles and try again.", "INVALID_ACCOUNT_ROLE"), flags: MessageFlags.Ephemeral })
-                }
-
-                if (!actor) {
-                    return interaction.reply({ ...message("Profile required", "We could not find your customer profile. Please complete registration or contact support.", "PROFILE_NOT_FOUND"), flags: MessageFlags.Ephemeral })
-                }
-
-                const actorAccess = await getAccountAccess(actor, selectedAccount)
-
-                if (!selectedAccount || actorAccess === null || actorAccess < config.accountAccesses.Manager) {
-                    return interaction.reply({ ...message("Account unavailable", "Check the account number and make sure you are authorised to manage access for this account.", "ACCOUNT_MANAGEMENT_UNAVAILABLE"), flags: MessageFlags.Ephemeral })
-                }
-
-                if (selectedAccount.status === "CLOSED") {
-                    return interaction.reply({ ...message("Account closed", "Access roles can no longer be changed for this account.", "ACCOUNT_CLOSED"), flags: MessageFlags.Ephemeral })
-                }
-
-                const target = await userFromDiscord(discordUser.id)
-
-                if (!target) {
-                    return interaction.reply({ ...message("Customer not found", "The selected user does not have a customer profile yet.", "CUSTOMER_NOT_FOUND"), flags: MessageFlags.Ephemeral })
-                }
-
-                const targetAccess = await getAccountAccess(target, selectedAccount)
-
-                if (
-                    requestedAccess === config.accountAccesses.Holder
-                    || targetAccess === config.accountAccesses.Holder
-                ) {
-                    return interaction.reply({ ...message("Holder access protected", "Holder access cannot be added, changed, or removed with this command.", "HOLDER_ACCESS_RESTRICTED"), flags: MessageFlags.Ephemeral })
-                }
-
-                if (removeAccess && targetAccess !== null && targetAccess >= actorAccess) {
-                    return interaction.reply({ ...message("Removal not permitted", "You can only remove customers with a lower access level than your own.", "ACCESS_LEVEL_RESTRICTED"), flags: MessageFlags.Ephemeral })
-                }
-
-                const managesElevatedAccess = requestedAccess >= config.accountAccesses.Manager
-                    || targetAccess >= config.accountAccesses.Manager
-
-                if (actorAccess < config.accountAccesses.Holder && managesElevatedAccess) {
-                    return interaction.reply({ ...message("Holder approval required", "Only an account holder can add, change, or remove Manager access.", "HOLDER_APPROVAL_REQUIRED"), flags: MessageFlags.Ephemeral })
-                }
-
-                if (removeAccess) {
-                    try {
-                        await removeAccountAccess(actor, target, selectedAccount)
-                    } catch (error) {
-                        console.error("Failed to remove account access!", error)
-
-                        if (error?.message === "ACCOUNT_ACCESS_NOT_FOUND") {
-                            return interaction.reply({ ...message("No access found", "This customer does not currently have access to the account.", "ACCOUNT_ACCESS_NOT_FOUND"), flags: MessageFlags.Ephemeral })
-                        }
-
-                        if (error?.message === "LAST_ACCOUNT_HOLDER") {
-                            return interaction.reply({ ...message("Holder required", "The account's last Holder cannot be removed. Add another Holder first.", "LAST_ACCOUNT_HOLDER"), flags: MessageFlags.Ephemeral })
-                        }
-
-                        if (error?.message === "ACCOUNT_CLOSED") {
-                            return interaction.reply({ ...message("Account closed", "Access roles can no longer be changed for this account.", "ACCOUNT_CLOSED"), flags: MessageFlags.Ephemeral })
-                        }
-
-                        return interaction.reply({ ...message("Access not removed", "We could not remove this customer's account access. Please try again or contact support.", "ACCESS_REMOVE_FAILED"), flags: MessageFlags.Ephemeral })
-                    }
-
-                    return interaction.reply({ ...message("Access removed", `${discordUser} no longer has access to **${selectedAccount.name}**.`), flags: MessageFlags.Ephemeral })
-                }
-
-                try {
-                    await setAccountAccess(actor, target, selectedAccount, requestedAccess)
-                } catch (error) {
-                    console.error("Failed to update account access!", error)
-
-                    if (error?.message === "ACCOUNT_ACCESS_NOT_ALLOWED") {
-                        return interaction.reply({ ...message("Role unavailable", `**${selectedAccount.type}** accounts do not support the **${roleName}** role.`, "ACCOUNT_ACCESS_NOT_ALLOWED"), flags: MessageFlags.Ephemeral })
-                    }
-
-                    if (error?.message === "ACCOUNT_ACCESS_LIMIT_REACHED") {
-                        return interaction.reply({ ...message("Access limit reached", `This account already has the maximum number of customers with the **${roleName}** role.`, "ACCOUNT_ACCESS_LIMIT_REACHED"), flags: MessageFlags.Ephemeral })
-                    }
-
-                    if (error?.message === "ACCOUNT_CLOSED") {
-                        return interaction.reply({ ...message("Account closed", "Access roles can no longer be changed for this account.", "ACCOUNT_CLOSED"), flags: MessageFlags.Ephemeral })
-                    }
-
-                    return interaction.reply({ ...message("Access not updated", "We could not update this customer's account access. Please try again or contact support.", "ACCESS_UPDATE_FAILED"), flags: MessageFlags.Ephemeral })
-                }
-
-                return interaction.reply({ ...message("Access updated", `${discordUser} now has the **${roleName}** role for **${selectedAccount.name}**.`), flags: MessageFlags.Ephemeral })
-            }
         }
     },
 
@@ -673,16 +659,37 @@ export default {
             case "from":
             case "account": {
                 const command = interaction.options.getSubcommand()
-                const requiredAccess = focused.name === "from" || command === "withdraw"
+                const requestGroup = interaction.options.getSubcommandGroup(false) === "request"
+
+                if (requestGroup && command === "unblock") {
+                    const user = await User.findOne({ attributes: ["id"], where: { discordId: interaction.user.id } })
+                    if (!user) return interaction.respond([])
+                    const blocks = await PaymentRequestBlock.findAll({
+                        attributes: ["requestingAccountId"],
+                        where: { blockedUserId: user.id },
+                        include: [{
+                            model: Account,
+                            as: "requestingAccount",
+                            attributes: ["name", "number", "type"],
+                            where: { [Op.or]: [
+                                { number: { [Op.like]: `%${focused.value}%` } },
+                                { name: { [Op.like]: `%${focused.value}%` } }
+                            ] }
+                        }],
+                        limit: 25
+                    })
+                    return interaction.respond(blocks.map(block => ({
+                        name: `${block.requestingAccount.name} - ${block.requestingAccount.type} - (${formatAccountNumber(block.requestingAccount.number)})`,
+                        value: block.requestingAccount.number
+                    })))
+                }
+
+                const requiredAccess = focused.name === "from" || command === "withdraw" || (requestGroup && command === "send")
                     ? config.accountAccesses.Signatory
-                    : command === "access"
-                        ? config.accountAccesses.Manager
-                        : config.accountAccesses.Viewer
-                const statusFilter = focused.name === "from" || command === "withdraw"
+                    : config.accountAccesses.Viewer
+                const statusFilter = focused.name === "from" || command === "withdraw" || (requestGroup && command === "send")
                     ? { status: "ACTIVE" }
-                    : command === "access"
-                        ? { status: { [Op.ne]: "CLOSED" } }
-                        : undefined
+                    : undefined
                 const accounts = await Account.findAll({
                     attributes: ["name", "number", "type"],
                     where: {[Op.and]: [

@@ -110,7 +110,8 @@ export const ledger = (sequelize) => {
         }, {
             indexes: [
                 { fields: ["payorId", "createdAt"] },
-                { fields: ["payeeId", "createdAt"] }
+                { fields: ["payeeId", "createdAt"] },
+                { fields: ["directDebitId", "createdAt"] }
             ]
         }
     )
