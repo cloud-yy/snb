@@ -1,31 +1,53 @@
 {
     "accounts": {
         "General": {
-            "type": "personal"
+            "type": "personal",
+            "access": {
+                "Holder": 1
+            }
         },
 
         "Business": {
             "type": "business",
-            "role": "Business Account Holder"
+            "role": "Business Account Holder",
+            "access": {
+                "Viewer": true,
+                "Signatory": 5,
+                "Holder": 2
+            }
         },
         
         "Enterprize": {
             "type": "business",
-            "role": "Business Account Holder"
+            "role": "Business Account Holder",
+            "access": {
+                "Viewer": true,
+                "Signatory": true,
+                "Holder": 10
+            }
         },
 
         "Exclusive": {
             "type": "personal",
-            "role": "Exclusive Account Holder"
+            "role": "Exclusive Account Holder",
+            "access": {
+                "Holder": 1
+            }
         },
 
         "Executive": {
             "type": "personal",
-            "role": "Executive Account Holder"
+            "role": "Executive Account Holder",
+            "access": {
+                "Holder": 1
+            }
         },
 
         "Reserve": {
-            "type": "reserve"
+            "type": "reserve",
+            "access": {
+                "Holder": 1
+            }
         }
     },
 
@@ -36,5 +58,24 @@
         "Holder": 20
     },
 
-    "currencies": ["HC$", "RW$", "CC$"]
+    "staffPermissions": {
+        "roles": {
+            "staff": "1531777851865432154",
+            "management": "1531777909449162932"
+        },
+        "commands": {
+            "deposit": "staff",
+            "open": "staff",
+            "access": "staff",
+            "transactions": "staff",
+            "logs": "staff",
+            "status": "staff",
+            "withdraw": "staff",
+            "embed": "management"
+        }
+    },
+
+    "currencies": ["HC$", "RW$", "CC$"],
+    "auditChannelId": "1553367619162210414",
+    "withdrawalChannelId": "1553356007961268324"
 }

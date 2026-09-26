@@ -1,4 +1,5 @@
 import { DiscordjsErrorCodes, MessageFlags, Events, RESTJSONErrorCodes } from "discord.js"
+import message from "#functions/templates/message"
 
 export default {
     event: Events.InteractionCreate,
@@ -23,7 +24,7 @@ export default {
                 return
             }
 
-            const errorMessage = { content: "There was an error executing this interaction!", flags: MessageFlags.Ephemeral }
+            const errorMessage = { ...message("Request not completed", "Something went wrong while processing your request. Please try again or contact support.", "INTERACTION_FAILED"), flags: MessageFlags.Ephemeral }
         
             if (interaction.replied || interaction.deferred) {
                 await interaction.followUp(errorMessage)

@@ -1,4 +1,5 @@
 import { Collection, MessageFlags, Events, time } from "discord.js"
+import message from "#functions/templates/message"
 
 export default {
     event: Events.InteractionCreate,
@@ -24,7 +25,7 @@ export default {
                     if (now < expiration) {
                         const expirationTime = Math.round(expiration / 1000)
 
-                        return interaction.reply({ content: `This command is on cooldown, you can use it again <t:${expirationTime}:R>`, flags: MessageFlags.Ephemeral })
+                        return interaction.reply({ ...message("Please wait", `You can use this command again <t:${expirationTime}:R>.`, "COMMAND_COOLDOWN"), flags: MessageFlags.Ephemeral })
                     }
                 }
 
@@ -37,7 +38,7 @@ export default {
             } catch (error) {
                 console.error(`Error executing ${interaction.commandName}:`, error)
 
-                const errorMessage = { content: "There was an error executing this command!", flags: MessageFlags.Ephemeral }
+                const errorMessage = { ...message("Command not completed", "Something went wrong while processing your request. Please try again or contact support.", "COMMAND_FAILED"), flags: MessageFlags.Ephemeral }
             
                 if (interaction.replied || interaction.deferred) {
                     await interaction.followUp(errorMessage)

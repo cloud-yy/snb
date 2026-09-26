@@ -105,3 +105,17 @@ export const accountBalance = (sequelize) => {
         }
     )
 }
+
+export const withdrawal = (sequelize) => sequelize.define("withdrawal", {
+    id: { type: DataTypes.BIGINT, primaryKey: true, autoIncrement: true },
+    requesterId: { type: DataTypes.BIGINT, allowNull: false },
+    accountId: { type: DataTypes.BIGINT, allowNull: false },
+    amount: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
+    currency: { type: DataTypes.STRING, allowNull: false, defaultValue: "HC$" },
+    status: { type: DataTypes.STRING, allowNull: false, defaultValue: "PENDING" },
+    messageId: { type: DataTypes.STRING },
+    processorId: { type: DataTypes.BIGINT },
+    ledgerId: { type: DataTypes.BIGINT }
+}, {
+    indexes: [{ fields: ["accountId", "status"] }, { fields: ["requesterId"] }]
+})

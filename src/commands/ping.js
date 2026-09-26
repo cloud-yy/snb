@@ -1,4 +1,5 @@
 import { MessageFlags, SlashCommandBuilder } from "discord.js"
+import message from "#functions/templates/message"
 
 export default {
     command: 
@@ -10,6 +11,6 @@ export default {
     scope: "global",
 
     execute: async (interaction) => {
-        return interaction.reply({ content: "Pong!", flags: MessageFlags.Ephemeral })
+        return interaction.reply({ ...message("Service status", "State National Bank services are online."), flags: MessageFlags.Ephemeral })
     }
 }

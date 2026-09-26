@@ -1,5 +1,6 @@
 import { userFromDiscord } from "#functions/db/user"
 import { MessageFlags } from "discord.js"
+import message from "#functions/templates/message"
 
 export default {
     id: "login",
@@ -10,9 +11,9 @@ export default {
         const user = await userFromDiscord(interaction.user.id)
 
         if (!user) {
-            return await interaction.editReply("Additional verification needed, please check your DMs from Rover.")
+            return await interaction.editReply(message("Verification required", "Please check your direct messages from Rover to finish connecting your account.", "VERIFICATION_REQUIRED"))
         }
 
-        return await interaction.editReply("Your user profile has been successfully created!")
+        return await interaction.editReply(message("Profile connected", "Your Discord and Roblox accounts are now connected to your State National Bank profile."))
     }
 }

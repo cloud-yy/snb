@@ -1,7 +1,7 @@
 import { Sequelize } from "sequelize"
 
 import { user } from "#models/user"
-import { account, accountAccess, accountBalance } from "#models/general"
+import { account, accountAccess, accountBalance, withdrawal } from "#models/general"
 import { auditLog, ledger } from "#models/logging"
 
 const sequelize = new Sequelize(process.env.POSTGRES_URI, {
@@ -27,6 +27,7 @@ AccountBalance.belongsTo(Account, { foreignKey: "accountId", onDelete: "RESTRICT
 
 const AuditLog = auditLog(sequelize)
 const Ledger = ledger(sequelize)
+const Withdrawal = withdrawal(sequelize)
 
 AuditLog.belongsTo(Account, { foreignKey: "accountId", onDelete: "RESTRICT", onUpdate: "CASCADE" })
 AuditLog.belongsTo(User, { foreignKey: "userId", onDelete: "SET NULL", onUpdate: "CASCADE" })
@@ -38,6 +39,11 @@ User.hasMany(AuditLog, { foreignKey: "userId", onDelete: "SET NULL", onUpdate: "
 Ledger.belongsTo(Account, { as: "payor", foreignKey: "payorId", onDelete: "RESTRICT", onUpdate: "CASCADE" })
 Ledger.belongsTo(Account, { as: "payee", foreignKey: "payeeId", onDelete: "RESTRICT", onUpdate: "CASCADE" })
 Ledger.hasMany(AuditLog, { foreignKey: "ledgerId", onDelete: "RESTRICT", onUpdate: "CASCADE" })
+
+Withdrawal.belongsTo(Account, { foreignKey: "accountId", onDelete: "RESTRICT" })
+Withdrawal.belongsTo(User, { as: "requester", foreignKey: "requesterId", onDelete: "RESTRICT" })
+Withdrawal.belongsTo(User, { as: "processor", foreignKey: "processorId", onDelete: "SET NULL" })
+Withdrawal.belongsTo(Ledger, { foreignKey: "ledgerId", onDelete: "RESTRICT" })
 
 Account.hasMany(Ledger, { as: "outgoingLedgers", foreignKey: "payorId", onDelete: "RESTRICT", onUpdate: "CASCADE" })
 Account.hasMany(Ledger, { as: "incomingLedgers", foreignKey: "payeeId", onDelete: "RESTRICT", onUpdate: "CASCADE" })
@@ -60,5 +66,6 @@ export {
 	AccountBalance,
 	
 	AuditLog,
-	Ledger
+	Ledger,
+	Withdrawal
 }
