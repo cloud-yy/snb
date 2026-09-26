@@ -1,16 +1,38 @@
+<!doctype html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>State National Bank</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="script.js"></script>
+    <title>{{BANK_NAME}}</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="icon" href="{{ICON_URL}}">
+    <link rel="apple-touch-icon" href="{{APPLE_ICON_URL}}">
+    <link rel="manifest" href="/site.webmanifest">
+    <meta name="theme-color" content="{{PRIMARY_COLOR}}">
+    <meta name="description" content="{{BANK_DESCRIPTION}}">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{{DOMAIN}}/">
+    <meta property="og:title" content="{{BANK_NAME}}">
+    <meta property="og:description" content="{{BANK_DESCRIPTION}}">
+    <meta property="og:image" content="{{BANNER_URL}}">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{BANK_NAME}}">
+    <meta name="twitter:description" content="{{BANK_DESCRIPTION}}">
+    <meta name="twitter:image" content="{{BANNER_URL}}">
+    <style>
+        :root {
+            --primary-color: {{PRIMARY_COLOR}};
+            --secondary-color: {{SECONDARY_COLOR}};
+        }
+    </style>
 </head>
 <body>
-    <h1>State National Bank</h1>
-    <h2>Your Business is Our Business</h2>
-    <p>Here at State National Bank our business is your business, we have been working tirelessly to provide you the most straight forward and convenient banking service.
-
-We have developed systems to make it as easy as possible to access and manage your money no matter the game or the rules. To get started with State National Bank see your options below, we are excited to start working with you!</p>
+    <main>
+        <img class="brand-banner" src="{{BANNER_URL}}" alt="{{BANK_NAME}}">
+        <h1>{{BANK_NAME}}</h1>
+        <p class="abbreviation">{{BANK_ABBREVIATION}}</p>
+        <h2>{{BANK_TAGLINE}}</h2>
+        <p>{{BANK_DESCRIPTION}}</p>
+    </main>
 </body>
 </html>

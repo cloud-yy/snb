@@ -106,34 +106,37 @@ export const accountBalance = (sequelize) => {
     )
 }
 
-export const withdrawal = (sequelize) => sequelize.define("withdrawal", {
-    id: { type: DataTypes.BIGINT, primaryKey: true, autoIncrement: true },
-    requesterId: { type: DataTypes.BIGINT, allowNull: false },
-    accountId: { type: DataTypes.BIGINT, allowNull: false },
-    amount: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
-    currency: { type: DataTypes.STRING, allowNull: false, defaultValue: "HC$" },
-    type: { type: DataTypes.STRING, allowNull: false, defaultValue: "WITHDRAWAL" },
-    status: { type: DataTypes.STRING, allowNull: false, defaultValue: "PENDING" },
-    messageId: { type: DataTypes.STRING },
-    processorId: { type: DataTypes.BIGINT },
-    ledgerId: { type: DataTypes.BIGINT }
-}, {
-    indexes: [{ fields: ["accountId", "status"] }, { fields: ["requesterId"] }]
-})
-
-export const directDebit = (sequelize) => sequelize.define("directDebit", {
+export const pap = (sequelize) => sequelize.define("pap", {
     id: { type: DataTypes.BIGINT, primaryKey: true, autoIncrement: true },
     payorId: { type: DataTypes.BIGINT, allowNull: false },
     payeeId: { type: DataTypes.BIGINT, allowNull: false },
     authorizedById: { type: DataTypes.BIGINT, allowNull: false },
     currency: { type: DataTypes.STRING, allowNull: false },
-    maxAmount: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
     weeklyLimit: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
-    totalLimit: { type: DataTypes.DECIMAL(10, 2) },
-    totalCollected: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0 },
     status: { type: DataTypes.STRING, allowNull: false, defaultValue: "ACTIVE" }
 }, {
-    indexes: [{ fields: ["payorId", "status"] }, { fields: ["payeeId", "status"] }]
+    indexes: [
+        { unique: true, fields: ["payorId", "payeeId"] },
+        { fields: ["payeeId", "status"] }
+    ]
+})
+
+export const papRequest = (sequelize) => sequelize.define("papRequest", {
+    id: { type: DataTypes.BIGINT, primaryKey: true, autoIncrement: true },
+    payorId: { type: DataTypes.BIGINT, allowNull: false },
+    payeeId: { type: DataTypes.BIGINT, allowNull: false },
+    requestedById: { type: DataTypes.BIGINT, allowNull: false },
+    processorId: { type: DataTypes.BIGINT },
+    papId: { type: DataTypes.BIGINT },
+    currency: { type: DataTypes.STRING, allowNull: false },
+    weeklyLimit: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
+    reference: { type: DataTypes.STRING(100), allowNull: false },
+    status: { type: DataTypes.STRING, allowNull: false, defaultValue: "PENDING" }
+}, {
+    indexes: [
+        { fields: ["payeeId", "status", "createdAt"] },
+        { fields: ["payorId", "status"] }
+    ]
 })
 
 export const businessLog = (sequelize) => sequelize.define("businessLog", {
@@ -150,10 +153,23 @@ export const businessLog = (sequelize) => sequelize.define("businessLog", {
     ]
 })
 
+export const businessApiKey = (sequelize) => sequelize.define("businessApiKey", {
+    id: { type: DataTypes.BIGINT, primaryKey: true, autoIncrement: true },
+    accountId: { type: DataTypes.BIGINT, allowNull: false, unique: true },
+    keyHash: { type: DataTypes.STRING(64), allowNull: false, unique: true },
+    createdById: { type: DataTypes.BIGINT, allowNull: false },
+    lastUsedAt: { type: DataTypes.DATE }
+}, {
+    indexes: [
+        { unique: true, fields: ["accountId"] },
+        { unique: true, fields: ["keyHash"] }
+    ]
+})
+
 export const paymentRequest = (sequelize) => sequelize.define("paymentRequest", {
     id: { type: DataTypes.BIGINT, primaryKey: true, autoIncrement: true },
     requesterId: { type: DataTypes.BIGINT, allowNull: false },
-    targetId: { type: DataTypes.BIGINT, allowNull: false },
+    targetAccountId: { type: DataTypes.BIGINT, allowNull: false },
     receivingAccountId: { type: DataTypes.BIGINT, allowNull: false },
     payingAccountId: { type: DataTypes.BIGINT },
     ledgerId: { type: DataTypes.BIGINT },
@@ -161,10 +177,10 @@ export const paymentRequest = (sequelize) => sequelize.define("paymentRequest", 
     currency: { type: DataTypes.STRING, allowNull: false },
     reference: { type: DataTypes.STRING, allowNull: false },
     status: { type: DataTypes.STRING, allowNull: false, defaultValue: "PENDING" },
-    messageId: { type: DataTypes.STRING }
+    messageIds: { type: DataTypes.JSONB, allowNull: false, defaultValue: [] }
 }, {
     indexes: [
-        { fields: ["targetId", "status"] },
+        { fields: ["targetAccountId", "status"] },
         { fields: ["receivingAccountId", "status"] },
         { fields: ["requesterId"] }
     ]
@@ -172,11 +188,11 @@ export const paymentRequest = (sequelize) => sequelize.define("paymentRequest", 
 
 export const paymentRequestBlock = (sequelize) => sequelize.define("paymentRequestBlock", {
     id: { type: DataTypes.BIGINT, primaryKey: true, autoIncrement: true },
-    blockedUserId: { type: DataTypes.BIGINT, allowNull: false },
+    blockedAccountId: { type: DataTypes.BIGINT, allowNull: false },
     requestingAccountId: { type: DataTypes.BIGINT, allowNull: false }
 }, {
     indexes: [
-        { unique: true, fields: ["blockedUserId", "requestingAccountId"] },
+        { unique: true, fields: ["blockedAccountId", "requestingAccountId"] },
         { fields: ["requestingAccountId"] }
     ]
 })

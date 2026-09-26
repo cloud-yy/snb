@@ -1,13 +1,17 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js"
-import { bannerImage, embed, snbEmoji } from "#functions/templates/templates"
+import { bankName, bannerImage, embed, bankEmoji } from "#functions/templates/templates"
+import config from "#config" with { type: "json" }
+
+const connectButton = new ButtonBuilder().setCustomId("login").setLabel("Connect Your Account").setStyle(ButtonStyle.Secondary)
+if (bankEmoji) connectButton.setEmoji(bankEmoji)
 
 export default {
   embeds: [
-    embed("State National Bank")
+    embed(bankName)
     .addFields(
       {
-        name: "Our Business is Your Business",
-        value: "Here at State National Bank our business is your business, we have been working tirelessly to provide you the most straight forward and convenient banking service.\n\nWe have developed systems to make it as easy as possible to access and manage your money no matter the game or the rules. To get started with State National Bank see your options below, we are excited to start working with you!",
+        name: config.branding.tagline,
+        value: `Here at ${bankName} our business is your business, and we work to provide a straightforward and convenient banking service.\n\nWe have developed systems that make it easy to access and manage your money. To get started with ${bankName}, see your options below.`,
         inline: false
       },
       {
@@ -25,6 +29,6 @@ export default {
   ],
 
   components: [
-    new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId("login").setLabel("Connect Your Account").setStyle(ButtonStyle.Secondary).setEmoji(snbEmoji))
+    new ActionRowBuilder().addComponents(connectButton)
   ]
 }

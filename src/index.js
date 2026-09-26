@@ -13,12 +13,12 @@ const { User, Message, GuildMember, ThreadMember } = Partials
 
 const web = express()
 web.use(express.json())
-web.use(express.static(path.join(process.cwd(), 'public')))
 
 const client = new Client({
 	intents: [Guilds, GuildMembers, GuildMessages, MessageContent, DirectMessages, GuildPresences],
 	partials: [User, Message, GuildMember, ThreadMember],
 })
+web.locals.discordClient = client
 
 client.commands = new Collection()
 client.interactions = new Collection()
@@ -30,6 +30,7 @@ client.options.presence = { activities: [{ name: "Operational" }], status: Prese
 let ready = false
 
 Promise.all([loadRoutes(web), loadEvents(client, ready), loadCommands(client), loadInteractions(client)]).then(() => {
+	web.use(express.static(path.join(process.cwd(), "public")))
 	console.log("Database connecting.")
 	sequelize.authenticate().then(() => {
 		console.log("Database connected.")
@@ -42,7 +43,7 @@ Promise.all([loadRoutes(web), loadEvents(client, ready), loadCommands(client), l
 				console.log("Logged in.")
 
 				console.log("Webserver starting.")
-				web.listen(8081)
+				web.listen(80)
 				console.log("Webserver started.")
 				ready = true
 				console.log("Ready!")

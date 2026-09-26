@@ -4,18 +4,7 @@ import { User } from "#models/models"
 import { Op } from "sequelize"
 
 export async function userFromDiscord (discordId, robloxData) {
-    let user = await User.findOne({
-        attributes: ["id", "discordId", "robloxId", "robloxName", "roverTimestamp", "role"],
-        where: {
-            discordId: discordId 
-        }
-    })
-
-    if (!user) {
-        user = await User.create({
-            discordId: discordId
-        })
-    }
+    const [user] = await User.findOrCreate({ where: { discordId: String(discordId) } })
 
     if (
         !user.robloxId ||

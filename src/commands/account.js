@@ -7,7 +7,7 @@ import {
     MessageFlags,
     SlashCommandBuilder
 } from "discord.js"
-import { Account, AccountBalance, PaymentRequestBlock, User, Withdrawal } from "#models/models"
+import { Account, AccountBalance, Pap, User } from "#models/models"
 import config from "#config" with { type: 'json' }
 import { Op } from "sequelize"
 import formatAccountNumber from "#functions/util/formatAccountNumber"
@@ -20,6 +20,8 @@ import { accountTransactionDetails, accountTransactionsPage } from "#functions/u
 import { auditLogPage } from "#functions/util/auditLogs"
 import { currentWeekAccountActivity } from "#functions/util/accountActivity"
 import { createPaymentRequest, unblockPaymentRequests } from "#functions/db/paymentRequest"
+import manageAccountAccess, { REMOVE_ACCOUNT_ACCESS } from "#functions/util/manageAccountAccess"
+import { authorizePap, editPap, revokePap } from "#functions/db/pap"
 
 function transferErrorMessage(error) {
     switch (error?.message) {
@@ -80,6 +82,66 @@ function activityText(totals) {
     return totals.length
         ? totals.map(total => `**${total.currency}:** ${formatCurrency(total.total)}`).join("\n")
         : "No activity"
+}
+
+function papError(error) {
+    const descriptions = {
+        INVALID_AMOUNT: "Enter a positive weekly limit with no more than two decimal places.",
+        INVALID_PAP: "Check the account numbers, currency, and weekly limit.",
+        HOLDER_REQUIRED: "A Holder of the paying account must manage this PAP.",
+        BUSINESS_ACCOUNT_REQUIRED: "The collecting account must be a business account.",
+        PAP_UNAVAILABLE: "No active PAP exists between those accounts.",
+        PAP_EXISTS: "An active PAP already exists between those accounts.",
+        ACCOUNT_UNAVAILABLE: "One of the accounts is unavailable."
+    }
+    if (!(error?.message in descriptions)) console.error("Account PAP failed:", error)
+    return { ...message("PAP not completed", descriptions[error?.message] || "Please try again or contact support.", error?.message in descriptions ? error.message : "PAP_FAILED"), flags: MessageFlags.Ephemeral }
+}
+
+async function managePap(interaction, action) {
+    const actor = await userFromDiscord(interaction.user.id)
+    if (!actor) return interaction.reply({ ...message("Profile required", "Complete registration before managing PAPs.", "PROFILE_NOT_FOUND"), flags: MessageFlags.Ephemeral })
+
+    try {
+        if (action === "list") {
+            const account = await accountFromNumber(interaction.options.getString("account"))
+            if (!account || !await hasAccountAccess(actor, account, config.accountAccesses.Viewer)) throw new Error("ACCOUNT_UNAVAILABLE")
+            const paps = await Pap.findAll({
+                where: { [Op.or]: [{ payorId: account.id }, { payeeId: account.id }] },
+                include: [
+                    { model: Account, as: "payor", attributes: ["name", "number"] },
+                    { model: Account, as: "payee", attributes: ["name", "number"] }
+                ],
+                order: [["createdAt", "DESC"]], limit: 10
+            })
+            const description = paps.length
+                ? paps.map(pap => {
+                    const other = String(pap.payorId) === String(account.id) ? pap.payee : pap.payor
+                    return `**${pap.status}** — ${other.name} (${formatAccountNumber(other.number)})\n${pap.currency} ${formatCurrency(pap.weeklyLimit)} per week`
+                }).join("\n\n")
+                : "No PAPs found."
+            return interaction.reply({ ...message("PAPs", description), flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } })
+        }
+
+        const payor = await accountFromNumber(interaction.options.getString("from"))
+        const payee = await accountFromNumber(interaction.options.getString("to"))
+        if (action === "authorize") {
+            const pap = await authorizePap(actor, payor, payee,
+                interaction.options.getString("currency"), interaction.options.getNumber("weekly_limit"))
+            return interaction.reply({ ...message("PAP authorized",
+                `**${payee.name}** can collect from **${payor.name}** in ${pap.currency}.\n**Weekly limit:** ${formatCurrency(pap.weeklyLimit)}\nUse \`/account pap edit\` to change the limit or \`/account pap revoke\` to stop collections.`), flags: MessageFlags.Ephemeral })
+        }
+        if (action === "edit") {
+            const pap = await editPap(actor, payor, payee, interaction.options.getNumber("weekly_limit"))
+            return interaction.reply({ ...message("PAP updated", `**Weekly limit:** ${pap.currency} ${formatCurrency(pap.weeklyLimit)}`), flags: MessageFlags.Ephemeral })
+        }
+        if (action === "revoke") {
+            await revokePap(actor, payor, payee)
+            return interaction.reply({ ...message("PAP revoked", "No further collections can be made between these accounts."), flags: MessageFlags.Ephemeral })
+        }
+    } catch (error) {
+        return interaction.reply(papError(error))
+    }
 }
 
 export default {
@@ -250,6 +312,18 @@ export default {
                         .addChoices(config.currencies.map(currency => ({ name: currency, value: currency }))))
             )
 
+            .addSubcommand(subcommand => subcommand
+                .setName("access").setDescription("Set or remove a user's access to an account")
+                .addStringOption(option => option.setName("account").setDescription("The account to manage").setRequired(true).setAutocomplete(true))
+                .addUserOption(option => option.setName("user").setDescription("The user whose access will be set").setRequired(true))
+                .addIntegerOption(option => option.setName("role").setDescription("The user's account role, or Remove to revoke access")
+                    .setRequired(true).addChoices(
+                        ...Object.entries(config.accountAccesses)
+                            .filter(([name]) => name !== "Holder")
+                            .map(([name, value]) => ({ name, value })),
+                        { name: "Remove", value: REMOVE_ACCOUNT_ACCESS }
+                    )))
+
             .addSubcommandGroup(group => group
                 .setName("request")
                 .setDescription("Request a payment from another customer")
@@ -261,9 +335,9 @@ export default {
                         .setDescription("The account that will receive the payment")
                         .setRequired(true)
                         .setAutocomplete(true))
-                    .addUserOption(option => option
-                        .setName("user")
-                        .setDescription("The customer to request payment from")
+                    .addStringOption(option => option
+                        .setName("paying_account")
+                        .setDescription("The number of the account that will pay")
                         .setRequired(true))
                     .addNumberOption(option => option
                         .setName("amount")
@@ -284,40 +358,65 @@ export default {
                     .setDescription("Allow an account to send you payment requests again")
                     .addStringOption(option => option
                         .setName("account")
-                        .setDescription("The previously blocked requesting account")
+                        .setDescription("Your account that blocked the requests")
                         .setRequired(true)
-                        .setAutocomplete(true)))),
+                        .setAutocomplete(true))
+                    .addStringOption(option => option
+                        .setName("requesting_account")
+                        .setDescription("The account number to allow requests from")
+                        .setRequired(true))))
+
+            .addSubcommandGroup(group => group
+                .setName("pap").setDescription("Manage pre authorised payments for your accounts")
+                .addSubcommand(subcommand => subcommand
+                    .setName("authorize").setDescription("Authorize a business to collect from your account")
+                    .addStringOption(option => option.setName("from").setDescription("Your paying account").setRequired(true).setAutocomplete(true))
+                    .addStringOption(option => option.setName("to").setDescription("The collecting business account number").setRequired(true))
+                    .addStringOption(option => option.setName("currency").setDescription("Currency").setRequired(true).addChoices(config.currencies.map(value => ({ name: value, value }))))
+                    .addNumberOption(option => option.setName("weekly_limit").setDescription("Maximum amount collectible each week").setRequired(true)))
+                .addSubcommand(subcommand => subcommand
+                    .setName("edit").setDescription("Change a PAP's weekly limit")
+                    .addStringOption(option => option.setName("from").setDescription("The paying account").setRequired(true).setAutocomplete(true))
+                    .addStringOption(option => option.setName("to").setDescription("The collecting business account number").setRequired(true))
+                    .addNumberOption(option => option.setName("weekly_limit").setDescription("New maximum amount collectible each week").setRequired(true)))
+                .addSubcommand(subcommand => subcommand
+                    .setName("revoke").setDescription("Stop future collections between two accounts")
+                    .addStringOption(option => option.setName("from").setDescription("The paying account").setRequired(true).setAutocomplete(true))
+                    .addStringOption(option => option.setName("to").setDescription("The collecting business account number").setRequired(true)))
+                .addSubcommand(subcommand => subcommand
+                    .setName("list").setDescription("List PAPs for one of your accounts")
+                    .addStringOption(option => option.setName("account").setDescription("Account to view").setRequired(true).setAutocomplete(true)))),
 
     cooldown: 0,
     scope: "global",
 
     execute: async (interaction) => {
         const command = interaction.options.getSubcommand()
+        if (interaction.options.getSubcommandGroup(false) === "pap") return managePap(interaction, command)
 
         switch(command) {
+            case "access":
+                return manageAccountAccess(interaction)
+
             case "send": {
                 const requester = await userFromDiscord(interaction.user.id)
-                const discordTarget = interaction.options.getUser("user")
                 if (!requester) {
                     return interaction.reply({ ...message("Profile required", "Complete registration before sending payment requests.", "PROFILE_NOT_FOUND"), flags: MessageFlags.Ephemeral })
                 }
-                if (!discordTarget || discordTarget.bot || discordTarget.id === interaction.user.id) {
-                    return interaction.reply({ ...message("Customer unavailable", "Choose another registered customer.", "PAYMENT_REQUEST_TARGET_UNAVAILABLE"), flags: MessageFlags.Ephemeral })
-                }
 
-                const [target, receivingAccount] = await Promise.all([
-                    User.findOne({ attributes: ["id", "discordId"], where: { discordId: discordTarget.id, robloxId: { [Op.ne]: null } } }),
+                const [targetAccount, receivingAccount] = await Promise.all([
+                    accountFromNumber(interaction.options.getString("paying_account")),
                     accountFromNumber(interaction.options.getString("account"))
                 ])
-                if (!target) {
-                    return interaction.reply({ ...message("Customer unavailable", "That user does not have a registered customer profile.", "PAYMENT_REQUEST_TARGET_UNAVAILABLE"), flags: MessageFlags.Ephemeral })
+                if (!targetAccount) {
+                    return interaction.reply({ ...message("Account unavailable", "No paying account was found with that number.", "PAYMENT_REQUEST_TARGET_UNAVAILABLE"), flags: MessageFlags.Ephemeral })
                 }
 
-                let request
+                let result
                 try {
-                    request = await createPaymentRequest(
+                    result = await createPaymentRequest(
                         requester,
-                        target,
+                        targetAccount,
                         receivingAccount,
                         interaction.options.getNumber("amount"),
                         interaction.options.getString("currency"),
@@ -325,18 +424,19 @@ export default {
                     )
                 } catch (error) {
                     if (error?.message === "PAYMENT_REQUEST_BLOCKED") {
-                        return interaction.reply({ ...message("Request blocked", "This account cannot send payment requests to that customer.", "PAYMENT_REQUEST_BLOCKED"), flags: MessageFlags.Ephemeral })
+                        return interaction.reply({ ...message("Request blocked", "This account cannot send payment requests to that paying account.", "PAYMENT_REQUEST_BLOCKED"), flags: MessageFlags.Ephemeral })
                     }
                     if (error?.message === "INVALID_AMOUNT" || error?.message === "INVALID_PAYMENT_REQUEST") {
                         return interaction.reply({ ...message("Invalid payment request", "Enter a positive amount with no more than two decimal places and a valid reference.", error.message), flags: MessageFlags.Ephemeral })
                     }
                     return interaction.reply({ ...message("Request not sent", "Check the account and make sure you have Signatory access, then try again.", "PAYMENT_REQUEST_FAILED"), flags: MessageFlags.Ephemeral })
                 }
+                const { request } = result
 
                 const notification = {
                     ...message(
                         "Payment requested",
-                        `**From:** ${receivingAccount.name} (${formatAccountNumber(receivingAccount.number)})\n**Amount:** ${request.currency} ${formatCurrency(request.amount)}\n**Reference:** ${request.reference}\n\nAccept to choose one of your accounts to pay from. Blocking stops this account from sending you more payment requests.`,
+                        `**From:** ${result.receivingAccount.name} (${formatAccountNumber(result.receivingAccount.number)})\n**Paying account:** ${result.targetAccount.name} (${formatAccountNumber(result.targetAccount.number)})\n**Amount:** ${request.currency} ${formatCurrency(request.amount)}\n**Reference:** ${request.reference}\n\nAccept to pay from the named account. Blocking stops the requesting account from sending this account more requests.`,
                         undefined,
                         `Request #${request.id}`
                     ),
@@ -348,26 +448,36 @@ export default {
                     allowedMentions: { parse: [] }
                 }
 
-                try {
-                    const dm = await discordTarget.send(notification)
-                    await request.update({ messageId: dm.id })
-                } catch (error) {
-                    console.error(`Could not DM payment request ${request.id}:`, error)
+                const signatories = await result.targetAccount.getUsers({
+                    attributes: ["discordId"],
+                    through: { attributes: [], where: { access: { [Op.gte]: config.accountAccesses.Signatory } } }
+                })
+                const deliveries = await Promise.allSettled(signatories
+                    .filter(signatory => signatory.discordId)
+                    .map(async signatory => (await interaction.client.users.fetch(signatory.discordId)).send(notification)))
+                const messageIds = deliveries
+                    .filter(delivery => delivery.status === "fulfilled")
+                    .map(delivery => delivery.value.id)
+                if (!messageIds.length) {
                     await request.update({ status: "CANCELLED" }).catch(console.error)
-                    return interaction.reply({ ...message("Request not delivered", "The customer could not be sent a DM. No payment request remains active.", "PAYMENT_REQUEST_DM_FAILED"), flags: MessageFlags.Ephemeral })
+                    return interaction.reply({ ...message("Request not delivered", "No Signatory of the paying account could be sent a DM. No payment request remains active.", "PAYMENT_REQUEST_DM_FAILED"), flags: MessageFlags.Ephemeral })
                 }
+                await request.update({ messageIds })
 
-                return interaction.reply({ ...message("Payment request sent", `${discordTarget} was asked to pay **${request.currency} ${formatCurrency(request.amount)}** to **${receivingAccount.name}**.`, undefined, `Request #${request.id}`), flags: MessageFlags.Ephemeral })
+                return interaction.reply({ ...message("Payment request sent", `Signatories of **${result.targetAccount.name}** were asked to pay **${request.currency} ${formatCurrency(request.amount)}** to **${result.receivingAccount.name}**.`, undefined, `Request #${request.id}`), flags: MessageFlags.Ephemeral })
             }
 
             case "unblock": {
-                const target = await userFromDiscord(interaction.user.id)
-                const requestingAccount = await accountFromNumber(interaction.options.getString("account"))
-                if (!target) {
+                const actor = await userFromDiscord(interaction.user.id)
+                const [blockedAccount, requestingAccount] = await Promise.all([
+                    accountFromNumber(interaction.options.getString("account")),
+                    accountFromNumber(interaction.options.getString("requesting_account"))
+                ])
+                if (!actor) {
                     return interaction.reply({ ...message("Profile required", "Complete registration before managing blocked requests.", "PROFILE_NOT_FOUND"), flags: MessageFlags.Ephemeral })
                 }
                 try {
-                    await unblockPaymentRequests(target, requestingAccount)
+                    await unblockPaymentRequests(actor, blockedAccount, requestingAccount)
                 } catch (error) {
                     return interaction.reply({ ...message("Block not found", "That account is not currently blocked from sending you payment requests.", "PAYMENT_REQUEST_BLOCK_NOT_FOUND"), flags: MessageFlags.Ephemeral })
                 }
@@ -397,38 +507,31 @@ export default {
                 }
 
                 await interaction.deferReply({ flags: MessageFlags.Ephemeral })
-                let request
                 let staffMessage
                 try {
                     const channel = await interaction.client.channels.fetch(config.requestChannelId || config.withdrawalChannelId)
                     if (!channel || typeof channel.send !== "function") throw new Error("REQUEST_CHANNEL_UNAVAILABLE")
 
-                    request = await Withdrawal.create({
-                        requesterId: user.id,
-                        accountId: account.id,
-                        amount,
-                        currency,
-                        type,
-                        status: "PENDING"
-                    })
                     const label = type === "DEPOSIT" ? "Deposit" : "Withdrawal"
-                    const notification = message(`${label} requested`, `**Customer:** <@${interaction.user.id}>\n**Account:** ${account.name} (${formatAccountNumber(account.number)})\n**Amount:** ${currency} ${formatCurrency(amount)}\n**Status:** Pending`, undefined, `Request #${request.id}`)
+                    const requestType = type === "DEPOSIT" ? "D" : "W"
+                    const amountInMinorUnits = Math.round(amount * 100)
+                    const encodedCurrency = Buffer.from(currency, "utf8").toString("base64url")
+                    const requestData = `${requestType}_${account.id}_${interaction.user.id}_${amountInMinorUnits}_${encodedCurrency}`
+                    const notification = message(`${label} requested`, `**Customer:** <@${interaction.user.id}>\n**Account:** ${account.name} (${formatAccountNumber(account.number)})\n**Amount:** ${currency} ${formatCurrency(amount)}\n**Status:** Pending`)
                     notification.allowedMentions = { parse: [] }
                     notification.components = [new ActionRowBuilder().addComponents(
-                        new ButtonBuilder().setCustomId(`cashrequest_${request.id}_complete`).setLabel("Complete").setStyle(ButtonStyle.Success),
-                        new ButtonBuilder().setCustomId(`cashrequest_${request.id}_decline`).setLabel("Decline").setStyle(ButtonStyle.Danger)
+                        new ButtonBuilder().setCustomId(`cashrequest_${requestData}_complete`).setLabel("Complete").setStyle(ButtonStyle.Success),
+                        new ButtonBuilder().setCustomId(`cashrequest_${requestData}_decline`).setLabel("Decline").setStyle(ButtonStyle.Danger)
                     )]
                     staffMessage = await channel.send(notification)
-                    await request.update({ messageId: staffMessage.id })
                 } catch (error) {
                     console.error(`Failed to submit ${type.toLowerCase()} request:`, error)
-                    if (request) await request.update({ status: "CANCELLED" }).catch(console.error)
                     if (staffMessage) await staffMessage.delete().catch(console.error)
                     return interaction.editReply(message("Request not submitted", "The staff request could not be delivered. No money was moved.", "ACCOUNT_REQUEST_FAILED"))
                 }
 
                 const label = type === "DEPOSIT" ? "Deposit" : "Withdrawal"
-                return interaction.editReply(message(`${label} requested`, `Your request for **${currency} ${formatCurrency(amount)}** involving **${account.name}** was sent to staff. This request does not move money by itself.`, undefined, `Request #${request.id}`))
+                return interaction.editReply(message(`${label} requested`, `Your request for **${currency} ${formatCurrency(amount)}** involving **${account.name}** was sent to staff. This request does not move money by itself.`))
             }
 
             case "logs": {
@@ -668,37 +771,21 @@ export default {
             case "account": {
                 const command = interaction.options.getSubcommand()
                 const requestGroup = interaction.options.getSubcommandGroup(false) === "request"
-
-                if (requestGroup && command === "unblock") {
-                    const user = await User.findOne({ attributes: ["id"], where: { discordId: interaction.user.id } })
-                    if (!user) return interaction.respond([])
-                    const blocks = await PaymentRequestBlock.findAll({
-                        attributes: ["requestingAccountId"],
-                        where: { blockedUserId: user.id },
-                        include: [{
-                            model: Account,
-                            as: "requestingAccount",
-                            attributes: ["name", "number", "type"],
-                            where: { [Op.or]: [
-                                { number: { [Op.like]: `%${focused.value}%` } },
-                                { name: { [Op.like]: `%${focused.value}%` } }
-                            ] }
-                        }],
-                        limit: 25
-                    })
-                    return interaction.respond(blocks.map(block => ({
-                        name: `${block.requestingAccount.name} - ${block.requestingAccount.type} - (${formatAccountNumber(block.requestingAccount.number)})`,
-                        value: block.requestingAccount.number
-                    })))
-                }
+                const papGroup = interaction.options.getSubcommandGroup(false) === "pap"
 
                 const cashRequest = command === "deposit" || command === "withdraw"
-                const requiredAccess = focused.name === "from" || cashRequest || (requestGroup && command === "send")
+                const managesAccess = command === "access"
+                const requiredAccess = managesAccess
+                    ? config.accountAccesses.Manager
+                    : papGroup && focused.name === "from" ? config.accountAccesses.Holder
+                    : focused.name === "from" || cashRequest || (requestGroup && ["send", "unblock"].includes(command))
                     ? config.accountAccesses.Signatory
                     : config.accountAccesses.Viewer
-                const statusFilter = focused.name === "from" || cashRequest || (requestGroup && command === "send")
-                    ? { status: "ACTIVE" }
-                    : undefined
+                const statusFilter = managesAccess
+                    ? { status: { [Op.ne]: "CLOSED" } }
+                    : focused.name === "from" || cashRequest || (requestGroup && ["send", "unblock"].includes(command))
+                        ? { status: "ACTIVE" }
+                        : undefined
                 const accounts = await Account.findAll({
                     attributes: ["name", "number", "type"],
                     where: {[Op.and]: [

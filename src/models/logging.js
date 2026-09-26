@@ -100,7 +100,7 @@ export const ledger = (sequelize) => {
                 type: DataTypes.BIGINT
             },
 
-            directDebitId: {
+            papId: {
                 type: DataTypes.BIGINT
             },
 
@@ -111,7 +111,7 @@ export const ledger = (sequelize) => {
             indexes: [
                 { fields: ["payorId", "createdAt"] },
                 { fields: ["payeeId", "createdAt"] },
-                { fields: ["directDebitId", "createdAt"] }
+                { fields: ["papId", "createdAt"] }
             ]
         }
     )

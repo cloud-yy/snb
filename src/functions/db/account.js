@@ -280,7 +280,7 @@ export async function transfer(from, to, rawAmount, currency, reference, user, {
     transaction: existingTransaction,
     ledgerType = "TRANSFER",
     auditAction = "TRANSFER",
-    directDebitId = null,
+    papId = null,
     authorize
 } = {}) {
     if (from.id === to.id) {
@@ -388,7 +388,7 @@ export async function transfer(from, to, rawAmount, currency, reference, user, {
             currency,
             status: "SUCCESS",
             type: ledgerType,
-            directDebitId,
+            papId,
             reference
         }, { transaction })
 
@@ -418,7 +418,7 @@ export async function transfer(from, to, rawAmount, currency, reference, user, {
 export async function accountFromNumber(number, transaction) {
     return await Account.findOne({
         attributes: ["id", "name", "number", "status", "type", "createdAt", "updatedAt"],
-        where: { number },
+        where: { number: String(number ?? "").replace(/\s+/g, "") },
         ...transaction && { transaction }
     })
 }

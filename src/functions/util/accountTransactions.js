@@ -16,7 +16,7 @@ async function transactionInitiators(transactions, account, includeIncoming = fa
             attributes: ["ledgerId", "userId"],
             where: {
                 ledgerId: { [Op.in]: outgoingIds },
-                action: { [Op.in]: ["TRANSFER", "DEPOSIT_COMPLETED", "WITHDRAWAL_COMPLETED", "DIRECT_DEBIT_COLLECTED", "PAYMENT_REQUEST_ACCEPTED"] }
+                action: { [Op.in]: ["TRANSFER", "DEPOSIT_COMPLETED", "WITHDRAWAL_COMPLETED", "PAP_COLLECTED", "PAYMENT_REQUEST_ACCEPTED"] }
             },
             include: [{ model: User, attributes: ["discordId", "robloxName"] }]
         })

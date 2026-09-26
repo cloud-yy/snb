@@ -1,13 +1,23 @@
-h1 {
+body {
+    margin: 0;
+    color: var(--primary-color);
+    font-family: Arial, sans-serif;
+}
+
+main {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 3rem 1.5rem;
     text-align: center;
 }
 
-h2 {
-    text-align: center;
+.brand-banner {
+    max-width: 100%;
+    max-height: 260px;
+    object-fit: contain;
 }
 
-p {
-    text-align: center;
-    padding-left: 25%;
-    padding-right: 25%;
+.abbreviation {
+    color: var(--secondary-color);
+    font-weight: bold;
 }

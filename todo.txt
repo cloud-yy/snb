@@ -7,7 +7,7 @@
 - discord gui for account management
 - implement card userId (?)
 - standing orders
-- direct debit
+- PAP
 - business commands and tools
 - external apis
 - Holding page

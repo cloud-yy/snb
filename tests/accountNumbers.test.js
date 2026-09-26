@@ -4,7 +4,7 @@ import { test } from "node:test"
 process.env.POSTGRES_URI ||= "postgres://test:test@localhost:5432/test"
 
 const { Account } = await import("../src/models/models.js")
-const { generateUniqueAccountNumber } = await import("../src/functions/db/account.js")
+const { accountFromNumber, generateUniqueAccountNumber } = await import("../src/functions/db/account.js")
 const { default: generateAccountNumber } = await import("../src/functions/util/generateAccountNumber.js")
 
 test("account numbers contain the configured number of four-digit groups", t => {
@@ -43,4 +43,13 @@ test("invalid account-number group counts are rejected", async () => {
     await assert.rejects(generateUniqueAccountNumber(0), {
         message: "INVALID_ACCOUNT_NUMBER_GROUPS"
     })
+})
+
+test("account lookup accepts the grouped number shown to customers", async t => {
+    t.mock.method(Account, "findOne", async options => {
+        assert.equal(options.where.number, "12345678")
+        return { id: "1", number: "12345678" }
+    })
+
+    assert.equal((await accountFromNumber("1234 5678")).id, "1")
 })

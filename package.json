@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "start": "node --env-file=.env ./src/index.js",
-    "register": "node --env-file=.env ./src/functions/util/registerCommands.js"
+    "register": "node --env-file=.env ./src/functions/util/registerCommands.js",
+    "dbclear": "node --env-file=.env ./src/functions/util/dbclear.js"
   },
   "imports": {
     "#commands/*": "./src/commands/*.js",

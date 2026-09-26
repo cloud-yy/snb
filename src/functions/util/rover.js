@@ -1,5 +1,6 @@
 import axios from "axios"
 import rateLimit from 'axios-rate-limit';
+import config from "#config" with { type: "json" }
 
 const BASE_URL = "https://registry.rover.link/api"
 const GUILD_ID = process.env.DISCORD_GUILD_ID
@@ -56,7 +57,7 @@ export async function discordFromRoblox (userId, guidId = GUILD_ID) {
 export async function accessRequest (userId, guidId = GUILD_ID) {
     try {
         const response = await api.put(`/guilds/${guidId}/access-requests/${userId}`,
-            { "callbackUrl": "https://snb.llc/rover/consent" })
+            { "callbackUrl": `${config.domain.replace(/\/$/, "")}/rover/consent` })
         
         return response.data
     } catch (error) {

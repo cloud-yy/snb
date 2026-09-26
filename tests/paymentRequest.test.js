@@ -13,17 +13,17 @@ const {
 
 const transaction = { LOCK: { UPDATE: "UPDATE" } }
 const requester = { id: "5" }
-const target = { id: "6", createAuditLog: async () => ({}) }
+const target = { id: "6", status: "ACTIVE", createAuditLog: async () => ({}) }
 
 test("a blocked account cannot send another payment request", async t => {
     t.mock.method(sequelize, "transaction", async callback => callback(transaction))
-    t.mock.method(Account, "findByPk", async () => ({ id: "1", status: "ACTIVE" }))
+    t.mock.method(Account, "findAll", async () => [{ id: "1", status: "ACTIVE" }, target])
     t.mock.method(AccountAccess, "findOne", async options => {
         assert.equal(options.where.access[Op.gte], 10)
         return { id: "2" }
     })
     t.mock.method(PaymentRequestBlock, "findOne", async options => {
-        assert.deepEqual(options.where, { blockedUserId: "6", requestingAccountId: "1" })
+        assert.deepEqual(options.where, { blockedAccountId: "6", requestingAccountId: "1" })
         return { id: "3" }
     })
     t.mock.method(PaymentRequest, "create", async () => { throw new Error("SHOULD_NOT_CREATE") })
@@ -41,12 +41,12 @@ test("sending a request records an account audit event", async t => {
         createAuditLog: async entry => { auditEntry = entry; return {} }
     }
     t.mock.method(sequelize, "transaction", async callback => callback(transaction))
-    t.mock.method(Account, "findByPk", async () => ({ id: "1", status: "ACTIVE" }))
+    t.mock.method(Account, "findAll", async () => [{ id: "1", status: "ACTIVE" }, target])
     t.mock.method(AccountAccess, "findOne", async () => ({ id: "2" }))
     t.mock.method(PaymentRequestBlock, "findOne", async () => null)
     t.mock.method(PaymentRequest, "create", async values => ({ id: "9", ...values }))
 
-    const request = await createPaymentRequest(auditingRequester, target, { id: "1" }, 25, "HC$", "  Invoice  ")
+    const { request } = await createPaymentRequest(auditingRequester, target, { id: "1" }, 25, "HC$", "  Invoice  ")
 
     assert.equal(request.reference, "Invoice")
     assert.equal(auditEntry.action, "PAYMENT_REQUEST_SENT")
@@ -57,10 +57,10 @@ test("sending a request records an account audit event", async t => {
 test("blocking a request closes it and records an account block", async t => {
     const request = {
         id: "9",
-        targetId: "6",
+        targetAccountId: "6",
         receivingAccountId: "1",
         status: "PENDING",
-        messageId: "message-1",
+        messageIds: ["message-1"],
         update: async values => Object.assign(request, values)
     }
     let blockWhere
@@ -69,10 +69,7 @@ test("blocking a request closes it and records an account block", async t => {
         assert.equal(options.lock, transaction.LOCK.UPDATE)
         return request
     })
-    t.mock.method(Account, "findByPk", async (_id, options) => {
-        assert.equal(options.lock, transaction.LOCK.UPDATE)
-        return { id: "1" }
-    })
+    t.mock.method(AccountAccess, "findOne", async () => ({ id: "4" }))
     t.mock.method(PaymentRequestBlock, "findOrCreate", async options => {
         blockWhere = options.where
         return [{ id: "3" }, true]
@@ -81,20 +78,20 @@ test("blocking a request closes it and records an account block", async t => {
     await closePaymentRequest(target, "9", "message-1", "BLOCKED")
 
     assert.equal(request.status, "BLOCKED")
-    assert.deepEqual(blockWhere, { blockedUserId: "6", requestingAccountId: "1" })
+    assert.deepEqual(blockWhere, { blockedAccountId: "6", requestingAccountId: "1" })
 })
 
 test("accepting a request pays it once and records the selected account", async t => {
     const request = {
         id: "9",
         requesterId: "5",
-        targetId: "6",
+        targetAccountId: "1",
         receivingAccountId: "2",
         amount: "25.00",
         currency: "HC$",
         reference: "Invoice",
         status: "PENDING",
-        messageId: "message-1",
+        messageIds: ["message-1"],
         update: async values => Object.assign(request, values)
     }
     const paying = { id: "1", name: "Paying", number: "11112222", status: "ACTIVE", type: "General" }
@@ -122,13 +119,13 @@ test("accepting a request pays it once and records the selected account", async 
         return { id: "20", uuid: "transaction-id", ...values }
     })
 
-    const result = await payPaymentRequest(target, "9", "message-1", "1")
+    const result = await payPaymentRequest({ id: "6", createAuditLog: async () => ({}) }, "9", "message-1")
     assert.equal(result.request.status, "PAID")
     assert.equal(result.request.payingAccountId, "1")
     assert.equal(result.request.ledgerId, "20")
     assert.equal(balances["1"].balance, 75)
     assert.equal(balances["2"].balance, 25)
 
-    await assert.rejects(payPaymentRequest(target, "9", "message-1", "1"), { message: "PAYMENT_REQUEST_UNAVAILABLE" })
+    await assert.rejects(payPaymentRequest({ id: "6" }, "9", "message-1"), { message: "PAYMENT_REQUEST_UNAVAILABLE" })
     assert.equal(ledgerCreates, 1)
 })

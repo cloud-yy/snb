@@ -23,10 +23,14 @@ const actionNames = {
     DEPOSIT_REQUEST_DECLINED: "Deposit request declined",
     WITHDRAWAL_REQUEST_COMPLETED: "Withdrawal request completed",
     WITHDRAWAL_REQUEST_DECLINED: "Withdrawal request declined",
-    DIRECT_DEBIT_AUTHORIZED: "Direct debit authorized",
-    DIRECT_DEBIT_COLLECTED: "Direct debit collected",
-    DIRECT_DEBIT_REVOKED: "Direct debit revoked",
+    PAP_AUTHORIZED: "PAP authorized",
+    PAP_UPDATED: "PAP updated",
+    PAP_REQUESTED: "PAP requested",
+    PAP_REQUEST_DECLINED: "PAP request declined",
+    PAP_COLLECTED: "PAP collected",
+    PAP_REVOKED: "PAP revoked",
     BUSINESS_LOG_CHANNEL_UPDATED: "Business log channel updated",
+    BUSINESS_API_KEY_ISSUED: "Business API key issued",
     PAYMENT_REQUEST_SENT: "Payment request sent",
     PAYMENT_REQUEST_ACCEPTED: "Payment request accepted",
     PAYMENT_REQUEST_DENIED: "Payment request denied",
@@ -81,7 +85,7 @@ function auditDetails(log, targets, showActor, showAccount) {
         }
     }
 
-    if (["TRANSFER", "DEPOSIT_COMPLETED", "WITHDRAWAL_COMPLETED", "DIRECT_DEBIT_COLLECTED", "PAYMENT_REQUEST_ACCEPTED"].includes(log.action)) {
+    if (["TRANSFER", "DEPOSIT_COMPLETED", "WITHDRAWAL_COMPLETED", "PAP_COLLECTED", "PAYMENT_REQUEST_ACCEPTED"].includes(log.action)) {
         if (log.before?.balance !== undefined && log.after?.balance !== undefined) {
             details.push(`**Balance change:** ${formatCurrency(log.before.balance)} → ${formatCurrency(log.after.balance)}`)
         }
@@ -103,6 +107,10 @@ function auditDetails(log, targets, showActor, showAccount) {
         const requestId = log.after?.requestId ?? log.before?.requestId
         if (requestId) details.push(`**Request:** #${requestId}`)
         if (log.after?.status) details.push(`**Status:** ${log.after.status}`)
+        if (log.after?.amount !== undefined && log.after?.currency) {
+            details.push(`**Amount:** ${log.after.currency} ${formatCurrency(log.after.amount)}`)
+        }
+        if (log.after?.requesterDiscordId) details.push(`**Customer:** <@${log.after.requesterDiscordId}>`)
     }
 
     if (log.action === "ACCOUNT_CREATED") {

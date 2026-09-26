@@ -2,7 +2,7 @@ import { Sequelize } from "sequelize"
 
 import { user } from "#models/user"
 import {
-	account, accountAccess, accountBalance, withdrawal, directDebit, businessLog,
+	account, accountAccess, accountBalance, pap, papRequest, businessLog, businessApiKey,
 	paymentRequest, paymentRequestBlock
 } from "#models/general"
 import { auditLog, ledger } from "#models/logging"
@@ -30,9 +30,10 @@ AccountBalance.belongsTo(Account, { foreignKey: "accountId", onDelete: "RESTRICT
 
 const AuditLog = auditLog(sequelize)
 const Ledger = ledger(sequelize)
-const Withdrawal = withdrawal(sequelize)
-const DirectDebit = directDebit(sequelize)
+const Pap = pap(sequelize)
+const PapRequest = papRequest(sequelize)
 const BusinessLog = businessLog(sequelize)
+const BusinessApiKey = businessApiKey(sequelize)
 const PaymentRequest = paymentRequest(sequelize)
 const PaymentRequestBlock = paymentRequestBlock(sequelize)
 
@@ -47,26 +48,31 @@ Ledger.belongsTo(Account, { as: "payor", foreignKey: "payorId", onDelete: "RESTR
 Ledger.belongsTo(Account, { as: "payee", foreignKey: "payeeId", onDelete: "RESTRICT", onUpdate: "CASCADE" })
 Ledger.hasMany(AuditLog, { foreignKey: "ledgerId", onDelete: "RESTRICT", onUpdate: "CASCADE" })
 
-Withdrawal.belongsTo(Account, { foreignKey: "accountId", onDelete: "RESTRICT" })
-Withdrawal.belongsTo(User, { as: "requester", foreignKey: "requesterId", onDelete: "RESTRICT" })
-Withdrawal.belongsTo(User, { as: "processor", foreignKey: "processorId", onDelete: "SET NULL" })
-Withdrawal.belongsTo(Ledger, { foreignKey: "ledgerId", onDelete: "RESTRICT" })
+Pap.belongsTo(Account, { as: "payor", foreignKey: "payorId", onDelete: "RESTRICT" })
+Pap.belongsTo(Account, { as: "payee", foreignKey: "payeeId", onDelete: "RESTRICT" })
+Pap.belongsTo(User, { as: "authorizer", foreignKey: "authorizedById", onDelete: "RESTRICT" })
+Ledger.belongsTo(Pap, { foreignKey: "papId", onDelete: "RESTRICT" })
 
-DirectDebit.belongsTo(Account, { as: "payor", foreignKey: "payorId", onDelete: "RESTRICT" })
-DirectDebit.belongsTo(Account, { as: "payee", foreignKey: "payeeId", onDelete: "RESTRICT" })
-DirectDebit.belongsTo(User, { as: "authorizer", foreignKey: "authorizedById", onDelete: "RESTRICT" })
-Ledger.belongsTo(DirectDebit, { foreignKey: "directDebitId", onDelete: "RESTRICT" })
+PapRequest.belongsTo(Account, { as: "payor", foreignKey: "payorId", onDelete: "RESTRICT" })
+PapRequest.belongsTo(Account, { as: "payee", foreignKey: "payeeId", onDelete: "RESTRICT" })
+PapRequest.belongsTo(User, { as: "requester", foreignKey: "requestedById", onDelete: "RESTRICT" })
+PapRequest.belongsTo(User, { as: "processor", foreignKey: "processorId", onDelete: "SET NULL" })
+PapRequest.belongsTo(Pap, { as: "pap", foreignKey: "papId", onDelete: "SET NULL" })
 
 BusinessLog.belongsTo(Account, { foreignKey: "accountId", onDelete: "CASCADE", onUpdate: "CASCADE" })
 Account.hasMany(BusinessLog, { foreignKey: "accountId", onDelete: "CASCADE", onUpdate: "CASCADE" })
 
+BusinessApiKey.belongsTo(Account, { foreignKey: "accountId", onDelete: "CASCADE", onUpdate: "CASCADE" })
+BusinessApiKey.belongsTo(User, { as: "creator", foreignKey: "createdById", onDelete: "RESTRICT", onUpdate: "CASCADE" })
+Account.hasOne(BusinessApiKey, { foreignKey: "accountId", onDelete: "CASCADE", onUpdate: "CASCADE" })
+
 PaymentRequest.belongsTo(User, { as: "requester", foreignKey: "requesterId", onDelete: "RESTRICT" })
-PaymentRequest.belongsTo(User, { as: "target", foreignKey: "targetId", onDelete: "RESTRICT" })
+PaymentRequest.belongsTo(Account, { as: "targetAccount", foreignKey: "targetAccountId", onDelete: "RESTRICT" })
 PaymentRequest.belongsTo(Account, { as: "receivingAccount", foreignKey: "receivingAccountId", onDelete: "RESTRICT" })
 PaymentRequest.belongsTo(Account, { as: "payingAccount", foreignKey: "payingAccountId", onDelete: "RESTRICT" })
 PaymentRequest.belongsTo(Ledger, { foreignKey: "ledgerId", onDelete: "RESTRICT" })
 
-PaymentRequestBlock.belongsTo(User, { as: "blockedUser", foreignKey: "blockedUserId", onDelete: "CASCADE" })
+PaymentRequestBlock.belongsTo(Account, { as: "blockedAccount", foreignKey: "blockedAccountId", onDelete: "CASCADE" })
 PaymentRequestBlock.belongsTo(Account, { as: "requestingAccount", foreignKey: "requestingAccountId", onDelete: "CASCADE" })
 
 Account.hasMany(Ledger, { as: "outgoingLedgers", foreignKey: "payorId", onDelete: "RESTRICT", onUpdate: "CASCADE" })
@@ -91,9 +97,10 @@ export {
 	
 	AuditLog,
 	Ledger,
-	Withdrawal,
-	DirectDebit,
+	Pap,
+	PapRequest,
 	BusinessLog,
+	BusinessApiKey,
 	PaymentRequest,
 	PaymentRequestBlock
 }

@@ -82,6 +82,24 @@
     },
 
     "currencies": ["HC$", "RW$", "CC$"],
+    "domain": "https://snb.llc",
+    "branding": {
+        "name": "State National Bank",
+        "abbreviation": "SNB",
+        "tagline": "Your Business is Our Business",
+        "description": "Banking solutions for individuals and businesses across all jurisdictions.",
+        "primaryColor": "#1C126E",
+        "secondaryColor": "#D01530",
+        "logos": {
+            "iconUrl": "https://cdn.discordapp.com/emojis/1531035917123322009.webp",
+            "bannerUrl": "https://snb.llc/snb_banner.png",
+            "emoji": "<:SNB:1531035917123322009>",
+            "faviconUrl": "/favicon.ico",
+            "appleTouchIconUrl": "/apple-touch-icon.png",
+            "webApp192Url": "/android-chrome-192x192.png",
+            "webApp512Url": "/android-chrome-512x512.png"
+        }
+    },
     "timezone": "Europe/London",
     "auditChannelId": "1553367619162210414",
     "requestChannelId": "1553356007961268324",

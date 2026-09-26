@@ -1,6 +1,7 @@
 import { MessageFlags, SlashCommandBuilder } from "discord.js"
 import { Account, User } from "#models/models"
 import register from "#functions/templates/register"
+import apiReference from "#functions/templates/apiReference"
 import config from "#config" with { type: 'json' }
 import { Op } from "sequelize"
 import formatAccountNumber from "#functions/util/formatAccountNumber"
@@ -247,7 +248,7 @@ export default {
                             .setRequired(true)
                             .addChoices(
                                 { name: "Register Prompt", value: "register" },
-                                { name: "Online Banking", value: "access" }
+                                { name: "API Reference", value: "api" }
                             )
                     )
             ),
@@ -390,10 +391,11 @@ export default {
                     return interaction.reply({ ...message("Account unavailable", "Check the account number and try again.", "ACCOUNT_UNAVAILABLE"), flags: MessageFlags.Ephemeral })
                 }
 
-                const [actor, target] = await Promise.all([
-                    userFromDiscord(interaction.user.id),
-                    userFromDiscord(discordUser.id)
-                ])
+                const actorLookup = userFromDiscord(interaction.user.id)
+                const targetLookup = discordUser.id === interaction.user.id
+                    ? actorLookup
+                    : userFromDiscord(discordUser.id)
+                const [actor, target] = await Promise.all([actorLookup, targetLookup])
 
                 if (!actor) {
                     return interaction.reply({ ...message("Staff profile required", "Your staff account is not linked to a customer profile.", "PROFILE_NOT_FOUND"), flags: MessageFlags.Ephemeral })
@@ -421,7 +423,7 @@ export default {
             case "embed": {
                 const channel = interaction.options.getChannel("channel") || interaction.channel
                 const selectedEmbed = interaction.options.getString("embed")
-                const templates = { register }
+                const templates = { register, api: apiReference }
 
                 await channel.send(templates[selectedEmbed])
 
@@ -519,10 +521,11 @@ export default {
                 const holder = interaction.options.getUser("holder")
                 const name = interaction.options.getString("name")
 
-                const [user, actor] = await Promise.all([
-                    userFromDiscord(holder.id),
-                    userFromDiscord(interaction.user.id)
-                ])
+                const holderLookup = userFromDiscord(holder.id)
+                const actorLookup = holder.id === interaction.user.id
+                    ? holderLookup
+                    : userFromDiscord(interaction.user.id)
+                const [user, actor] = await Promise.all([holderLookup, actorLookup])
 
                 if (!user) {
                     return interaction.reply({ ...message("Customer not found", "The selected user must complete registration before an account can be opened.", "CUSTOMER_NOT_FOUND"), flags: MessageFlags.Ephemeral })
